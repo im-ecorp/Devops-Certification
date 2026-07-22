@@ -1,0 +1,14 @@
+---
+- name: Verify the Docker daemon is responding
+  ansible.builtin.command:
+    cmd: docker info
+  changed_when: false
+  when:
+    - docker_service_state == 'started'
+    - not ansible_check_mode
+
+- name: Verify the Docker Compose plugin is available
+  ansible.builtin.command:
+    cmd: docker compose version
+  changed_when: false
+  when: not ansible_check_mode

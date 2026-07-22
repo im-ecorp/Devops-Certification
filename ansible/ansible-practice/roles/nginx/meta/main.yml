@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: local
+  description: Manage Nginx configuration for practice hosts.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags:
+    - nginx
+    - web
+
+dependencies: []

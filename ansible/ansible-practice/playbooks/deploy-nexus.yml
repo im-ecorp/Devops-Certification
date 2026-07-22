@@ -1,0 +1,8 @@
+---
+- name: Deploy Nexus Repository behind Traefik
+  hosts: nexus
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker
+    - role: nexus

@@ -1,0 +1,8 @@
+---
+- name: Gather facts now that Python is available
+  ansible.builtin.setup:
+    gather_subset:
+      - "!all"
+
+- name: Verify Python-based Ansible modules work
+  ansible.builtin.ping:

@@ -1,0 +1,20 @@
+---
+- name: Wait for Nexus container to become healthy
+  ansible.builtin.command:
+    cmd: "docker inspect --format={{ '{{' }}.State.Health.Status{{ '}}' }} {{ nexus_container_name }}"
+  register: nexus_health
+  changed_when: false
+  retries: "{{ (nexus_startup_timeout | int / 10) | int }}"
+  delay: 10
+  until: nexus_health.stdout == 'healthy'
+
+- name: Verify Nexus status endpoint through Traefik
+  ansible.builtin.uri:
+    url: "{{ 'https' if nexus_traefik_tls else 'http' }}://{{ nexus_domain }}/service/rest/v1/status"
+    method: GET
+    status_code: 200
+    validate_certs: "{{ nexus_verify_tls }}"
+  register: nexus_status_check
+  retries: 12
+  delay: 5
+  until: nexus_status_check.status == 200

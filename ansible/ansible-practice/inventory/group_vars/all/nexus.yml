@@ -1,0 +1,16 @@
+---
+nexus_domain: nexus.k8sforfun.com
+nexus_traefik_network: traefik_proxy
+nexus_traefik_certresolver: letsencrypt
+
+# This image version is pinned for the practice environment.
+nexus_image: sonatype/nexus3:3.94.0
+
+# Optional: publish Nexus directly as well as through Traefik. Keep empty for
+# a Traefik-only deployment.
+nexus_published_ports: []
+# nexus_published_ports:
+#   - "127.0.0.1:8081:8081"
+
+# Put credentials in an Ansible Vault-encrypted file; do not commit plaintext secrets.
+# nexus_admin_password: "..."

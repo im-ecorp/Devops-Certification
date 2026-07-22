@@ -1,0 +1,26 @@
+---
+- name: Update the apt cache and safely upgrade installed packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: safe
+    autoclean: true
+    autoremove: true
+
+- name: Set the hostname from inventory
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Install base administration packages
+  ansible.builtin.apt:
+    name:
+      - vim
+      - curl
+      - wget
+      - git
+      - htop
+      - iotop
+      - bash-completion
+      - iptables-persistent
+      - net-tools
+      - tmux
+    state: present

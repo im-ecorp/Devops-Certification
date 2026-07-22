@@ -1,0 +1,33 @@
+---
+# Nexus container
+nexus_image: sonatype/nexus3:3.87.0
+nexus_container_name: nexus
+nexus_compose_project_name: nexus
+nexus_deploy_dir: /opt/nexus
+nexus_data_dir: "{{ nexus_deploy_dir }}/nexus-data"
+nexus_timezone: UTC
+nexus_java_xms: 1200m
+nexus_java_xmx: 1200m
+nexus_published_ports: []
+
+# Traefik integration. Traefik is assumed to already be running on this
+# Docker network. Set nexus_traefik_network_create true only if this role is
+# also responsible for creating that shared network.
+nexus_domain: nexus.example.com
+nexus_traefik_network: traefik_proxy
+nexus_traefik_network_create: false
+nexus_traefik_entrypoint: websecure
+nexus_traefik_certresolver: ""
+nexus_traefik_middlewares: []
+nexus_traefik_tls: true
+
+# The dedicated Docker role installs and manages Docker Engine.
+nexus_docker_compose_command: docker compose
+
+# Nexus needs write access as the UID used inside the upstream image.
+nexus_uid: '200'
+nexus_gid: '200'
+
+# Validation / startup behavior
+nexus_startup_timeout: 600
+nexus_verify_tls: true

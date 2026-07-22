@@ -1,0 +1,55 @@
+---
+- name: Create Nexus deployment directory
+  ansible.builtin.file:
+    path: "{{ nexus_deploy_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create persistent Nexus data directory
+  ansible.builtin.file:
+    path: "{{ nexus_data_dir }}"
+    state: directory
+    owner: "{{ nexus_uid }}"
+    group: "{{ nexus_gid }}"
+    mode: '0750'
+
+- name: Check whether the Traefik Docker network exists
+  ansible.builtin.command:
+    cmd: "docker network inspect {{ nexus_traefik_network }}"
+  register: nexus_traefik_network_inspect
+  changed_when: false
+  failed_when: false
+
+- name: Create shared Traefik Docker network when requested
+  ansible.builtin.command:
+    cmd: "docker network create {{ nexus_traefik_network }}"
+  when:
+    - nexus_traefik_network_inspect.rc != 0
+    - nexus_traefik_network_create | bool
+  changed_when: true
+
+- name: Require existing Traefik Docker network
+  ansible.builtin.assert:
+    that: nexus_traefik_network_inspect.rc == 0 or nexus_traefik_network_create | bool
+    fail_msg: >-
+      Docker network '{{ nexus_traefik_network }}' does not exist. Deploy
+      Traefik first, correct nexus_traefik_network, or set
+      nexus_traefik_network_create=true.
+
+- name: Render Nexus Compose definition
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ nexus_deploy_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0640'
+
+- name: Start Nexus with Docker Compose
+  ansible.builtin.command:
+    cmd: "{{ nexus_docker_compose_command }} -f {{ nexus_deploy_dir }}/compose.yml up -d --remove-orphans"
+  register: nexus_compose_up
+  changed_when: >-
+    'Created' in nexus_compose_up.stdout or 'Started' in nexus_compose_up.stdout or
+    'Recreated' in nexus_compose_up.stdout

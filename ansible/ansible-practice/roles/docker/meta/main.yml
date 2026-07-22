@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: local
+  description: Install Docker Engine CE from Docker's official apt repository.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags:
+    - docker
+    - containers
+
+dependencies: []

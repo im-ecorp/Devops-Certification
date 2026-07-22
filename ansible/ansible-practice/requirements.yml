@@ -1,0 +1,4 @@
+---
+# Add third-party Ansible collections here when the project needs them.
+# The current roles deliberately use only ansible-core built-in modules.
+collections: []

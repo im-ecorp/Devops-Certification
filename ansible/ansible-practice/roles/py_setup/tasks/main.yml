@@ -1,0 +1,12 @@
+---
+- name: Install Python 3
+  include_tasks: installation.yml
+  tags:
+    - install_python
+    - python_setup
+
+- name: Configure Ansible after Python installation
+  include_tasks: configuration.yml
+  tags:
+    - configure_python
+    - python_setup

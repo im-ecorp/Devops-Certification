@@ -1,0 +1,18 @@
+---
+- name: Validate Docker role platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == 'Debian'
+      - ansible_facts.distribution in ['Debian', 'Ubuntu']
+    fail_msg: >-
+      This local Docker role supports Debian and Ubuntu only. Extend the
+      repository setup before using it on another distribution.
+
+- name: Install Docker Engine
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure Docker Engine
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Verify Docker Engine
+  ansible.builtin.import_tasks: verify.yml

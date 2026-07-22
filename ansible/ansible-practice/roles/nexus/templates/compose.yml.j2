@@ -1,0 +1,43 @@
+---
+services:
+  nexus:
+    image: {{ nexus_image | quote }}
+    container_name: {{ nexus_container_name | quote }}
+    restart: unless-stopped
+    environment:
+      TZ: {{ nexus_timezone | quote }}
+      INSTALL4J_ADD_VM_PARAMS: {{ ('-Xms' ~ nexus_java_xms ~ ' -Xmx' ~ nexus_java_xmx ~ ' -XX:MaxDirectMemorySize=2g') | quote }}
+    volumes:
+      - {{ nexus_data_dir | quote }}:/nexus-data
+{% if nexus_published_ports | length > 0 %}
+    ports:
+{% for port in nexus_published_ports %}
+      - {{ port | quote }}
+{% endfor %}
+{% endif %}
+    networks:
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: {{ nexus_traefik_network | quote }}
+      traefik.http.services.nexus.loadbalancer.server.port: "8081"
+      traefik.http.routers.nexus.rule: {{ ('Host(`' ~ nexus_domain ~ '`)') | quote }}
+      traefik.http.routers.nexus.entrypoints: {{ nexus_traefik_entrypoint | quote }}
+      traefik.http.routers.nexus.tls: {{ nexus_traefik_tls | string | lower | quote }}
+{% if nexus_traefik_certresolver | length > 0 %}
+      traefik.http.routers.nexus.tls.certresolver: {{ nexus_traefik_certresolver | quote }}
+{% endif %}
+{% if nexus_traefik_middlewares | length > 0 %}
+      traefik.http.routers.nexus.middlewares: {{ nexus_traefik_middlewares | join(',') | quote }}
+{% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8081/service/rest/v1/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+networks:
+  traefik:
+    external: true
+    name: {{ nexus_traefik_network | quote }}

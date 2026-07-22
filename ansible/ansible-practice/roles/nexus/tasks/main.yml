@@ -1,0 +1,16 @@
+---
+- name: Validate Nexus deployment inputs
+  ansible.builtin.assert:
+    that:
+      - nexus_domain | length > 0
+      - nexus_traefik_network | length > 0
+      - nexus_image | length > 0
+      - nexus_java_xms | length > 0
+      - nexus_java_xmx | length > 0
+    fail_msg: Set nexus_domain, nexus_traefik_network, nexus_image, nexus_java_xms, and nexus_java_xmx.
+
+- name: Deploy Nexus and Traefik configuration
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: Verify Nexus is reachable through Traefik
+  ansible.builtin.import_tasks: verify.yml
