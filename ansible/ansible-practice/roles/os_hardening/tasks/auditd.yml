@@ -1,0 +1,30 @@
+---
+- name: Install auditd package | package-08
+  ansible.builtin.package:
+    name: "{{ auditd_package }}"
+    state: present
+  tags: auditd
+
+- name: Configure auditd | package-08
+  ansible.builtin.template:
+    src: "{{ os_auditd_template }}"
+    dest: /etc/audit/auditd.conf
+    owner: root
+    group: root
+    mode: "0640"
+  notify:
+    - Restart auditd via service
+    - Restart auditd via systemd
+  tags: auditd
+
+- name: Disable systemd-journald.audit
+  when:
+    - ansible_facts.os_family != 'Suse'  # socket doesn't seem to exist on suse
+  ansible.builtin.systemd:
+    name: systemd-journald-audit.socket
+    state: stopped
+    enabled: false
+    masked: true
+  notify:
+    - Restart journald
+  tags: auditd
