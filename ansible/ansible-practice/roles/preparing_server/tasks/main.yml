@@ -18,9 +18,14 @@
       - wget
       - git
       - htop
-      - iotop
       - bash-completion
       - iptables-persistent
-      - net-tools
       - tmux
     state: present
+
+
+- name:  fail2ban Installation and configuration
+  ansible.builtin.include_tasks:
+    file: fail2ban.yml
+  tags:
+    - fail2ban_setup

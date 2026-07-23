@@ -1,0 +1,47 @@
+---
+- name: Install fail2ban
+  ansible.builtin.package:
+    name: fail2ban
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags:
+    - fail2ban_setup
+
+- name: Configure fail2ban
+  ansible.builtin.template:
+    src: etc/fail2ban/jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: '0644'
+  register: fail2ban_jail_result
+  notify:
+    - Restart fail2ban
+  tags:
+    - fail2ban_setup
+
+- name: "Enable and start fail2ban service"
+  ansible.builtin.service:
+    name: "fail2ban"
+    state: "started"
+    enabled: true
+  tags:
+    - fail2ban_setup
+
+- name: "Verify fail2ban SSH jail is active"
+  ansible.builtin.command: "fail2ban-client status sshd"
+  changed_when: false
+  register: fail2ban_status
+  failed_when: false
+  tags:
+    - fail2ban_setup
+
+- name: "Debug fail2ban status (verbosity >=1)"
+  when: ansible_verbosity >= 1
+  ansible.builtin.debug:
+    msg:
+      - "jail.local updated: {{ fail2ban_jail_result.changed | default(false) }}"
+      - "fail2ban sshd jail: {{ fail2ban_status.stdout | default('not available') }}"
+  tags:
+    - fail2ban_setup

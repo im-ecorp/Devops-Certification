@@ -1,2 +1,19 @@
 ---
-# defaults file for preparing
+
+# SSH jail settings
+linux_fail2ban_ssh_enabled: true
+linux_fail2ban_ssh_port: "2223"
+linux_fail2ban_ssh_filter: "sshd"
+linux_fail2ban_ssh_logpath: "/var/log/auth.log"
+linux_fail2ban_whitelist_ips:
+  - "127.0.0.1/8"
+  - "::1"
+  - "89.167.72.70"
+  - "94.182.18.26"
+linux_fail2ban_ssh_maxretry: 5
+linux_fail2ban_ssh_bantime: 3600
+linux_fail2ban_ssh_findtime: 600
+
+# Backend for log monitoring
+linux_fail2ban_backend: "systemd"
+
