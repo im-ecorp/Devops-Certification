@@ -33,7 +33,7 @@
   ansible.builtin.command: "fail2ban-client status sshd"
   changed_when: false
   register: fail2ban_status
-  failed_when: false
+  failed_when: fail2ban_status.rc != 0
   tags:
     - fail2ban_setup
 
