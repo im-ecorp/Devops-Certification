@@ -1,7 +1,7 @@
 ---
 
 # true if IPv6 is needed
-network_ipv6_enable: true # sshd + ssh
+network_ipv6_enable: false # sshd + ssh
 
 # Paths of the config files
 ssh_client_config_file: /etc/ssh/ssh_config # ssh
@@ -23,18 +23,18 @@ ssh_compression: false # sshd
 
 # For which components (client and server) to generate the configuration for.
 # Can be useful when running against a client without an SSH server.
-ssh_client_hardening: true # ssh
+ssh_client_hardening: false # ssh
 ssh_server_hardening: true # sshd
 
 # If true, password login is allowed
-ssh_client_password_login: false # ssh
+ssh_client_password_login: true # ssh
 ssh_server_password_login: false # sshd
 
 # ports on which ssh-server should listen
 ssh_server_ports: ["3031"] # sshd
 
 # port to which ssh-client should connect
-ssh_client_port: "3031" # ssh
+ssh_client_port: "22" # ssh
 
 # one or more ip addresses, to which ssh-server should listen to.
 # Default is empty, but should be configured for security reasons!
@@ -77,7 +77,7 @@ ssh_permit_tunnel: "no"
 #     options: ['StrictHostKeyChecking no']
 ssh_remote_hosts: []
 # Set this to "without-password" or "yes" to allow root to login
-ssh_permit_root_login: "without-password" # sshd
+ssh_permit_root_login: "prohibit-password" # sshd
 
 # false to disable TCP Forwarding. Set to 'yes', 'no', 'local', 'all' or 'remote'
 # to allow TCP Forwarding.
@@ -122,7 +122,7 @@ ssh_deny_groups: "" # sshd
 ssh_allow_groups: "root" # sshd
 
 # change default file that contains the public keys that can be used for user authentication.
-ssh_authorized_keys_file: "" # sshd
+ssh_authorized_keys_file: ".ssh/authorized_keys" # sshd
 
 # specifies the file containing trusted certificate authorities public keys used to sign user certificates.
 ssh_trusted_user_ca_keys_file: "" # sshd
