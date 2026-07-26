@@ -146,3 +146,15 @@
   ansible.builtin.service:
     name: "{{ sshd_service_name }}"
     enabled: "{{ ssh_server_service_enabled }}"
+
+- name: Install SSH warning banner
+  ansible.builtin.copy:
+    src: issue
+    dest: "{{ item }}"
+    mode: "0644"
+    owner: "{{ ssh_owner }}"
+    group: "{{ ssh_group }}"
+  loop: "{{ ['/etc/issue', '/etc/issue.net', ssh_banner_path] | unique }}"
+  when:
+    - ssh_server_hardening | bool
+    - ssh_banner | bool

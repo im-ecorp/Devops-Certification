@@ -217,11 +217,12 @@ argument_specs:
           ssh server. You probably also need to change `sshd_authenticationmethods`
           to include `password` if you set `ssh_server_password_login`: `true`.'
       ssh_banner:
-        default: false
+        default: true
         type: bool
         description: Set to `true` to print a banner on login.
       ssh_banner_path:
-        default: /etc/sshd/banner.txt
+        default: /etc/issue
+        type: str
         description: path to the SSH banner file.
       ssh_client_hardening:
         default: true

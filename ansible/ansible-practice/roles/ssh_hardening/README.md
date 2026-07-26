@@ -125,12 +125,12 @@ For more information, see [this issue](https://github.com/dev-sec/ansible-collec
   - Type: str
   - Required: no
 - `ssh_banner`
-  - Default: `False`
+  - Default: `True`
   - Description: Set to `true` to print a banner on login.
   - Type: bool
   - Required: no
 - `ssh_banner_path`
-  - Default: `/etc/sshd/banner.txt`
+  - Default: `/etc/issue`
   - Description: path to the SSH banner file.
   - Type: str
   - Required: no

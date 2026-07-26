@@ -160,10 +160,10 @@ ssh_print_pam_motd: false # sshd
 ssh_print_last_log: true # sshd
 
 # false to disable serving ssh warning banner before authentication is allowed
-ssh_banner: false # sshd
+ssh_banner: true # sshd
 
 # path to file with ssh warning banner
-ssh_banner_path: /etc/ssh/banner.txt
+ssh_banner_path: /etc/issue
 
 # false to disable distribution version leakage during initial protocol handshake
 ssh_print_debian_banner: false # sshd (Debian OS family only)
