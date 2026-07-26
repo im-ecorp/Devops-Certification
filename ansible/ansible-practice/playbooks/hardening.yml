@@ -5,3 +5,4 @@
   gather_facts: true
   roles:
     - ssh_hardening
+    - os_hardening

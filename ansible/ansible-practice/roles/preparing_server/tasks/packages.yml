@@ -64,10 +64,12 @@
   register: reboot_required_file
   tags:
     - install_packages
-
+    - check_reboot
+    
 - name: Notify if reboot is required
   ansible.builtin.debug:
     msg: "Server {{ inventory_hostname }} requires a reboot!"
   when: reboot_required_file.stat.exists
   tags:
     - install_packages
+    - check_reboot

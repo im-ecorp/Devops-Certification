@@ -4,7 +4,8 @@
     file: packages.yml
   tags:
     - install_packages
-
+    - check_reboot
+    
 - name:  fail2ban Installation and configuration
   ansible.builtin.include_tasks:
     file: fail2ban.yml
