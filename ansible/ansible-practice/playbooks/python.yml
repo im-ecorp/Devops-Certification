@@ -1,5 +1,5 @@
 - name: Install and configure Python
-  hosts: nexus-01
+  hosts: all
   become: true
   gather_facts: false
   roles:
