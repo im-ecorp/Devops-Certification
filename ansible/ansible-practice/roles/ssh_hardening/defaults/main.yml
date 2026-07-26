@@ -60,10 +60,10 @@ ssh_login_grace_time: 30s
 ssh_max_auth_retries: 2
 
 # Specifies the maximum number of open sessions permitted from a given connection
-ssh_max_sessions: 10
+ssh_max_sessions: 2
 
 ssh_client_alive_interval: 300 # sshd
-ssh_client_alive_count: 3 # sshd
+ssh_client_alive_count: 2 # sshd
 
 # Allow SSH Tunnels
 ssh_permit_tunnel: "no"
@@ -157,7 +157,7 @@ ssh_print_motd: false # sshd
 ssh_print_pam_motd: false # sshd
 
 # false to disable display of last login information
-ssh_print_last_log: false # sshd
+ssh_print_last_log: true # sshd
 
 # false to disable serving ssh warning banner before authentication is allowed
 ssh_banner: false # sshd
