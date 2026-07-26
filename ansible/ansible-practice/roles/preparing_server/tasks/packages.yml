@@ -4,7 +4,7 @@
   ansible.builtin.apt:
     upgrade: safe
     update_cache: true
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts["os_family"] == 'Debian'
   tags:
     - install_packages
 
@@ -14,7 +14,7 @@
     name: "*"
     state: latest
     update_cache: true
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts["os_family"] == 'RedHat'
   tags:
     - install_packages
 
@@ -29,22 +29,22 @@
 - name: Set hostname
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"
-    tags:
-      - install_packages
+  tags:
+    - install_packages
 
 # --- CLEANUP TASKS ---
 - name: Remove unused APT dependencies
   ansible.builtin.apt:
     autoremove: true
     autoclean: true
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts["os_family"] == 'Debian'
   tags:
     - install_packages
 
 - name: Remove unused DNF/YUM dependencies
   ansible.builtin.dnf:
     autoremove: true
-  when: ansible_os_family == 'RedHat'
+  when: ansible_facts["os_family"] == 'RedHat'
   tags:
     - install_packages
 
