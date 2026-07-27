@@ -3,3 +3,14 @@
   ansible.builtin.service:
     name: "fail2ban"
     state: "restarted"
+
+- name: Reload netfilter-persistent
+  ansible.builtin.service:
+    name: netfilter-persistent
+    state: restarted
+    
+- name: Restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  failed_when: false # Ignores errors on the 1st run when Docker isn't installed yet

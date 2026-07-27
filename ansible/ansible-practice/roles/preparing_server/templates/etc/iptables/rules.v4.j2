@@ -1,0 +1,91 @@
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# -----------------------------------------------------------------------------
+# Early TCP Flag Filtering (Mangle PREROUTING - Drops malformed packets early)
+# -----------------------------------------------------------------------------
+-A PREROUTING -p tcp -m tcp --tcp-flags ALL NONE -j DROP -m comment --comment "Drop NULL packets"
+-A PREROUTING -p tcp -m tcp --tcp-flags ALL ALL -j DROP -m comment --comment "Drop XMAS packets"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,SYN FIN,SYN -j DROP -m comment --comment "Drop SYN-FIN malformed packets"
+-A PREROUTING -p tcp -m tcp --tcp-flags SYN,RST SYN,RST -j DROP -m comment --comment "Drop SYN-RST malformed packets"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,RST FIN,RST -j DROP -m comment --comment "Drop FIN-RST malformed packets"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,ACK FIN -j DROP -m comment --comment "Drop FIN without ACK"
+-A PREROUTING -p tcp -m tcp --tcp-flags ACK,URG URG -j DROP -m comment --comment "Drop URG without ACK"
+-A PREROUTING -p tcp -m tcp --tcp-flags PSH,ACK PSH -j DROP -m comment --comment "Drop PSH without ACK"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,PSH,URG -j DROP -m comment --comment "Drop old-style nmap Xmas scan"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,PSH,URG -j DROP -m comment --comment "Drop SYN-PSH malformed scan"
+-A PREROUTING -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,ACK,URG -j DROP -m comment --comment "Drop all flags set scan"
+
+COMMIT
+
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:CHECK_INPUT - [0:0]
+:DOCKER-USER - [0:0]
+
+# Route all incoming host traffic into CHECK_INPUT
+-A INPUT -j CHECK_INPUT -m comment --comment "Jump all incoming traffic to CHECK_INPUT chain"
+
+# -----------------------------------------------------------------------------
+# CHECK_INPUT Chain
+# -----------------------------------------------------------------------------
+# Drop invalid packets immediately
+-A CHECK_INPUT -m conntrack --ctstate INVALID -j DROP -m comment --comment "Drop invalid connection states"
+
+# Allow established and related connections
+-A CHECK_INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "Allow established and related traffic"
+
+# Allow ICMP / Ping
+-A CHECK_INPUT -p icmp --icmp-type echo-request -j ACCEPT -m comment --comment "Allow incoming ICMP ping requests"
+
+# Network Adapters (e.g. lo)
+{% if iptables is defined and iptables.network_adapter_access is defined and iptables.network_adapter_access %}
+{% for net in iptables.network_adapter_access %}
+-A CHECK_INPUT -i {{ net }} -j ACCEPT -m comment --comment "Allow interface {{ net }}"
+{% endfor %}
+{% endif %}
+
+# SSH Access
+{% set current_ssh_port = iptables.ssh_port if (iptables is defined and iptables.ssh_port is defined) else (ssh_port | default(22)) %}
+-A CHECK_INPUT -p tcp --dport {{ current_ssh_port }} -m conntrack --ctstate NEW -j ACCEPT -m comment --comment "Allow new incoming SSH connections on port {{ current_ssh_port }}"
+
+# Allowed TCP Ports
+{% if iptables is defined and iptables.tcp_port_access is defined and iptables.tcp_port_access %}
+{% for tcp in iptables.tcp_port_access %}
+-A CHECK_INPUT -p tcp --dport {{ tcp }} -m conntrack --ctstate NEW -j ACCEPT -m comment --comment "Allow new incoming TCP port {{ tcp }}"
+{% endfor %}
+{% endif %}
+
+# Allowed UDP Ports
+{% if iptables is defined and iptables.udp_port_access is defined and iptables.udp_port_access %}
+{% for udp in iptables.udp_port_access %}
+-A CHECK_INPUT -p udp --dport {{ udp }} -m conntrack --ctstate NEW -j ACCEPT -m comment --comment "Allow new incoming UDP port {{ udp }}"
+{% endfor %}
+{% endif %}
+
+# Whitelisted Trusted Host IPs
+{% if iptables is defined and iptables.trusted_IP is defined and iptables.trusted_IP %}
+{% for ip in iptables.trusted_IP %}
+-A CHECK_INPUT -s {{ ip }} -j ACCEPT -m comment --comment "Allow trusted host IP {{ ip }}"
+{% endfor %}
+{% endif %}
+
+# Whitelisted Trusted Subnet Ranges
+{% if iptables is defined and iptables.trusted_Range is defined and iptables.trusted_Range %}
+{% for range in iptables.trusted_Range %}
+-A CHECK_INPUT -s {{ range }} -j ACCEPT -m comment --comment "Allow trusted subnet range {{ range }}"
+{% endfor %}
+{% endif %}
+
+# -----------------------------------------------------------------------------
+# Docker Pass-Through
+# -----------------------------------------------------------------------------
+-A DOCKER-USER -j RETURN -m comment --comment "Return back to standard filter processing for Docker"
+
+COMMIT

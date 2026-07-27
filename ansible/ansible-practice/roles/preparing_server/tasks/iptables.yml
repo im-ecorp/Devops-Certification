@@ -1,0 +1,29 @@
+---
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+  tags:
+    - iptables
+
+- name: Stop and Disable ufw service if installed
+  ansible.builtin.service:
+    name: ufw
+    state: stopped
+    enabled: false
+  when: "'ufw' in ansible_facts.services or 'ufw.service' in ansible_facts.services"
+  tags:
+    - iptables
+    
+- name: Deploy iptables configuration
+  ansible.builtin.template:
+    src: etc/iptables/rules.v4.j2
+    dest: /etc/iptables/rules.v4
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'iptables-restore -t %s'
+  notify:
+    - Reload netfilter-persistent
+    - Restart docker
+  tags:
+  - iptables

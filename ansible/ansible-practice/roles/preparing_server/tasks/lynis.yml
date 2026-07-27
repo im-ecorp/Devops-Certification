@@ -1,0 +1,38 @@
+---
+- name: Lynis | Create install directory
+  ansible.builtin.file:
+    path: "{{ lynis_tarball_unpackdest_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  tags:
+    - lynis
+
+- name: Lynis | Download latest stable version
+  ansible.builtin.get_url:
+    url: "{{ lynis_tarball_url }}"
+    dest: "{{ lynis_tarball_dest }}"
+    force: no
+    validate_certs: yes
+    mode: '0644'
+  tags:
+    - lynis
+
+- name: Lynis | Unpack tarball
+  ansible.builtin.unarchive:
+    src: "{{ lynis_tarball_dest }}"
+    dest: "{{ lynis_tarball_unpackdest_dir }}"
+    remote_src: yes
+    copy: no
+    extra_opts:
+      - --strip-components=1
+  tags:
+    - lynis
+
+- name: Lynis | Remove tarball
+  ansible.builtin.file:
+    path: "{{ lynis_tarball_dest }}"
+    state: absent
+  tags:
+    - lynis

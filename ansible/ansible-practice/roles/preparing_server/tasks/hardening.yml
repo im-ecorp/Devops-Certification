@@ -1,0 +1,9 @@
+---
+
+- name: Set authorized key took from url
+  authorized_key:
+    user: root
+    state: present
+    key: {{ authorized_keys_url }}
+  tags: 
+    - hardening

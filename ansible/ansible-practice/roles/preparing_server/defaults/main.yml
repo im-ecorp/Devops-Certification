@@ -1,15 +1,16 @@
 ---
 
-# SSH jail settings
-linux_fail2ban_ssh_enabled: true
-linux_fail2ban_ssh_port: "{{ ssh_port | default('ssh') }}"
-linux_fail2ban_ssh_filter: "sshd"
-linux_fail2ban_ssh_logpath: "/var/log/auth.log"
-linux_fail2ban_whitelist_ips:
-  - "127.0.0.1/8"
-  - "::1"
+trusted_ips:
   - "89.167.72.70"
   - "77.221.141.93"
+
+
+# SSH jail settings
+linux_fail2ban_ssh_enabled: true
+linux_fail2ban_ssh_port: "{{ ansible_port | default(22) }}"
+linux_fail2ban_ssh_filter: "sshd"
+linux_fail2ban_ssh_logpath: "/var/log/auth.log"
+linux_fail2ban_whitelist_ips: "{{ ['127.0.0.1/8', '::1'] + (trusted_ips | default([])) }}"
 linux_fail2ban_ssh_maxretry: 5
 linux_fail2ban_ssh_bantime: 3600
 linux_fail2ban_ssh_findtime: 600
@@ -28,4 +29,32 @@ preparing_server_packages:
   - tmux
   - zip
   - unzip
+  - jq
+  - ncdu
+  - sudo
+  - ntp
+  - telnet
 
+
+iptables:
+  ssh_port: "{{ ansible_port | default(22) }}"
+  network_adapter_access:
+    - lo
+  tcp_port_access:
+    - 80
+    - 443
+  udp_port_access:
+    - 53
+  trusted_IP: "{{ trusted_ips | default([]) }}"
+  trusted_Range:
+    - 10.60.10.0/24
+
+authorized_keys_url: "https://github.com/im-ecorp.keys"
+
+# lynis variables
+lynis_version: '3.1.7'
+lynis_name: 'lynis-{{ lynis_version }}'
+lynis_tarball_url: 'https://cisofy.com/files/{{ lynis_name }}.tar.gz'
+lynis_tarball_unpackdest: '/opt'
+lynis_tarball_unpackdest_dir: '{{ lynis_tarball_unpackdest }}/lynis'
+lynis_tarball_dest: '{{ lynis_tarball_unpackdest_dir }}/{{ lynis_name }}.tar.gz'

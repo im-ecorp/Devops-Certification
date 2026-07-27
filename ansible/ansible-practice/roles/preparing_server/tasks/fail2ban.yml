@@ -7,6 +7,7 @@
     cache_valid_time: 3600
   tags:
     - fail2ban_setup
+    - fail2ban
 
 - name: Configure fail2ban
   ansible.builtin.template:
@@ -20,6 +21,8 @@
     - Restart fail2ban
   tags:
     - fail2ban_setup
+    - fail2ban
+
 
 - name: "Enable and start fail2ban service"
   ansible.builtin.service:
@@ -28,6 +31,7 @@
     enabled: true
   tags:
     - fail2ban_setup
+    - fail2ban
 
 - name: "Verify fail2ban SSH jail is active"
   ansible.builtin.command: "fail2ban-client status sshd"
@@ -36,6 +40,7 @@
   failed_when: fail2ban_status.rc != 0
   tags:
     - fail2ban_setup
+    - fail2ban
 
 - name: "Debug fail2ban status (verbosity >=1)"
   when: ansible_verbosity >= 1
@@ -45,3 +50,5 @@
       - "fail2ban sshd jail: {{ fail2ban_status.stdout | default('not available') }}"
   tags:
     - fail2ban_setup
+    - fail2ban
+

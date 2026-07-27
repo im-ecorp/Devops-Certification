@@ -6,8 +6,27 @@
     - install_packages
     - check_reboot
     
+- name: Configure iptables
+  ansible.builtin.include_tasks:
+    file: iptables.yml
+  tags:
+    - iptables
+    
 - name:  fail2ban Installation and configuration
   ansible.builtin.include_tasks:
     file: fail2ban.yml
   tags:
     - fail2ban_setup
+    - fail2ban
+
+- name: Download and configure Lynis
+  ansible.builtin.include_tasks:
+    file: lynis.yml
+  tags:
+    - lynis
+
+- name: preparing hardening
+  ansible.builtin.include_tasks:
+    file: hardening.yml
+  tags:
+    - hardening
