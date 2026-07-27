@@ -1,0 +1,39 @@
+{%- set daemon_config = {} -%}
+{%- if docker_config.proxy.enabled | bool -%}
+{%- set _ = daemon_config.update({
+  'proxies': {
+    'http-proxy': docker_config.proxy.http_proxy,
+    'https-proxy': docker_config.proxy.https_proxy,
+    'no-proxy': docker_config.proxy.no_proxy
+  }
+}) -%}
+{%- endif -%}
+{%- if docker_config.logging.enabled | bool -%}
+{%- set _ = daemon_config.update({
+  'log-driver': 'json-file',
+  'log-opts': {
+    'labels': docker_config.logging.labels,
+    'max-file': docker_config.logging.max_file,
+    'max-size': docker_config.logging.max_size
+  }
+}) -%}
+{%- endif -%}
+{%- if docker_config.mirror_registry.enabled | bool -%}
+{%- set _ = daemon_config.update({
+  'registry-mirrors': [docker_config.mirror_registry.urls]
+}) -%}
+{%- endif -%}
+{%- if docker_config.insecure_registry.enabled | bool -%}
+{%- set _ = daemon_config.update({
+  'insecure-registries': [
+    docker_config.insecure_registry.urls | regex_replace('^https?://', '')
+  ]
+}) -%}
+{%- endif -%}
+{%- if docker_config.experimental.enabled | bool -%}
+{%- set _ = daemon_config.update({'experimental': true}) -%}
+{%- endif -%}
+{%- if docker_config.live_restore.enabled | bool -%}
+{%- set _ = daemon_config.update({'live-restore': true}) -%}
+{%- endif %}
+{{ daemon_config | to_nice_json }}

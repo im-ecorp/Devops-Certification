@@ -1,0 +1,11 @@
+# docker-ce apt repositories
+
+{% set repo = "stable" %}
+{% if docker_repo.channel.nightly_enabled %}
+{% set repo = "edge" %}
+{% endif %}
+{% if docker_repo.channel.test_enabled %}
+{% set repo = "test" %}
+{% endif %}
+
+deb [arch={{ docker_apt_arch | default('amd64') }} signed-by={{ docker_gpg_key_path }}] {{ repo_url }} {{ ansible_facts.distribution_release }} {{ repo }}

@@ -1,34 +1,66 @@
 ---
-# Docker's stable apt repository is used for supported Debian and Ubuntu hosts.
-docker_apt_channel: stable
-docker_repository_url: >-
-  https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}
+docker_dependencies:
+  - acl
+  - python3-ruamel.yaml
+  - python3-pip
+  - python3-docker
+  - python3-requests
+  - python3-urllib3
+  - python3-virtualenv
+  - net-tools
+  - iproute2
+  - gpg
 
-# These are the packages Docker documents for a complete Engine installation.
 docker_packages:
+  - acl
   - docker-ce
   - docker-ce-cli
   - containerd.io
-  - docker-buildx-plugin
   - docker-compose-plugin
-docker_packages_state: present
+  - docker-ce-rootless-extras
+  - docker-buildx-plugin
+  - docker-model-plugin
 
-# Docker requires these potentially conflicting distribution packages to be absent.
-# Removing them does not remove /var/lib/docker or existing container data.
-docker_conflicting_packages:
-  - docker.io
-  - docker-compose
-  - docker-compose-v2
-  - docker-doc
-  - podman-docker
-  - containerd
-  - runc
+use_nexus: false
 
-docker_service_state: started
-docker_service_enabled: true
+docker_repo:
+  channel:
+    stable_enabled: true
+    test_enabled: false
+    nightly_enabled: false
+  nexus_repo_urls:
+    debian: "https://repo.mecan.ir/repository/debian-docker/"
+    ubuntu: "https://repo.mecan.ir/repository/ubuntu-docker/"
+  nexus_gpg_urls:
+    debian: "https://repo.mecan.ir/repository/debian-docker/gpg"
+    ubuntu: "https://repo.mecan.ir/repository/ubuntu-docker/gpg"
+  official_repo_url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}"
+  official_gpg_url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}/gpg"
 
-# Members of the docker group effectively receive root-level privileges.
-docker_users: []
+repo_url: "{{ docker_repo.nexus_repo_urls[ansible_facts.distribution | lower] if use_nexus else docker_repo.official_repo_url }}"
+gpg_url: "{{ docker_repo.nexus_gpg_urls[ansible_facts.distribution | lower] if use_nexus else docker_repo.official_gpg_url }}"
+docker_gpg_key_path: /etc/apt/keyrings/docker.asc
 
-# When non-empty, this dictionary is written to /etc/docker/daemon.json.
-docker_daemon_options: {}
+docker_config:
+  proxy:
+    enabled: true
+    http_proxy: "http://127.0.0.1:8090"
+    https_proxy: "{{ docker_config.proxy.http_proxy }}"
+    no_proxy: "hub.mecan.ir, 127.0.0.1/8, localhost"
+  logging:
+    enabled: true
+    labels: "{{ inventory_hostname }}"
+    max_file: "5"
+    max_size: "100M"
+  mirror_registry:
+    enabled: true
+    urls: "https://hub.hamdocker.ir"
+  insecure_registry:
+    enabled: true
+    urls: "https://test.k8sforfun.com"
+  live_restore:
+    enabled: true
+  experimental:
+    enabled: true
+
+

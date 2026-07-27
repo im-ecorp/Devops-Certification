@@ -1,36 +1,50 @@
-# Docker role
+Role Name
+=========
 
-Installs Docker Engine CE on Debian or Ubuntu from Docker's official apt
-repository. The role installs the Engine, CLI, containerd, Buildx plugin, and
-Compose plugin, then ensures the Docker service is enabled and running.
+A brief description of the role goes here.
 
-The implementation intentionally follows a short, explicit sequence:
+Requirements
+------------
 
-1. Remove package names that conflict with Docker CE.
-2. Install the apt repository prerequisites.
-3. Configure Docker's signed apt repository.
-4. Install the official Docker packages.
-5. Apply optional daemon configuration and group membership.
-6. Verify the daemon and Compose plugin.
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
 
-## Variables
+Role Variables
+--------------
 
-The defaults are documented in `defaults/main.yml`. Common overrides include:
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
 
-```yaml
-docker_users:
-  - vagrant
+Dependencies
+------------
 
-docker_daemon_options:
-  log-driver: json-file
-  log-opts:
-    max-size: 100m
-    max-file: "3"
-```
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
 
-Set `docker_packages_state: latest` when you intentionally want an Ansible run
-to upgrade the installed Docker packages. The safer default is `present`.
+Example Playbook
+----------------
 
-Membership in the `docker` group grants root-equivalent access. A user may need
-to log out and back in before new group membership is visible in an existing
-shell.
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+
+TODO:
+
+  - [ ] install requirements
+  - [ ] add gpg key docker
+  - [ ] add repo docker
+    - [ ] change repo mecan
+  - [ ] install docker
+  - [ ] config mirror registry
+  - [ ] config live restore
+  - [ ] config docker logging
