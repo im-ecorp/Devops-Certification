@@ -19,13 +19,12 @@ linux_fail2ban_ssh_findtime: 600
 linux_fail2ban_backend: "systemd"
 
 
-preparing_server_packages:
+preparing_server_common_packages:
   - curl
   - vim
   - git
   - wget
   - bash-completion
-  - iptables-persistent
   - tmux
   - zip
   - unzip
@@ -34,6 +33,12 @@ preparing_server_packages:
   - sudo
   - chrony
   - telnet
+
+preparing_server_debian_packages:
+  - iptables-persistent
+
+preparing_server_redhat_packages:
+  - iptables-services
 
 
 iptables:

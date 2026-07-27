@@ -21,7 +21,15 @@
 # --- COMMON TASKS ---
 - name: Install basic tools
   ansible.builtin.package:
-    name: "{{ preparing_server_packages }}"
+    name: >-
+      {{
+        preparing_server_common_packages
+        + (
+          preparing_server_debian_packages
+          if ansible_facts["os_family"] == "Debian"
+          else preparing_server_redhat_packages
+        )
+      }}
     state: present
   tags:
     - install_packages
