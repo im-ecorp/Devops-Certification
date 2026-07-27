@@ -4,6 +4,6 @@
   authorized_key:
     user: root
     state: present
-    key: {{ authorized_keys_url }}
+    key: "{{ authorized_keys_url }}"
   tags: 
     - hardening

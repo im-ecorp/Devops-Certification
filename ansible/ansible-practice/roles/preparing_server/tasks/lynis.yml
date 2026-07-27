@@ -24,7 +24,6 @@
     src: "{{ lynis_tarball_dest }}"
     dest: "{{ lynis_tarball_unpackdest_dir }}"
     remote_src: yes
-    copy: no
     extra_opts:
       - --strip-components=1
   tags:
