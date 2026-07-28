@@ -1,0 +1,8 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json
+- name: Install and configure Traefik service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - traefik_setup

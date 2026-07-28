@@ -1,0 +1,57 @@
+services:
+
+  traefik:
+    image: traefik:${image_tag}
+    container_name: traefik
+    hostname: traefik
+    restart: ${restart_policy}
+    command:
+      - "--log.level=INFO"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web_net"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web-secure.address=:443"
+      - "--entryPoints.web-secure.http.tls=true"
+      - "--entryPoints.web.http.redirections.entryPoint.to=web-secure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.myproduction.acme.tlschallenge=true"
+      # - "--certificatesresolvers.myproduction.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # - "--certificatesresolvers.myproduction.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.myproduction.acme.email=${acme_email}"
+      - "--certificatesresolvers.myproduction.acme.storage=/certs/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "traefik_data:/certs"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      # - "traefik.http.middlewares.web-auth.basicauth.users=${web_auth_user}:${web_auth_pass}"
+      - "traefik.http.routers.http-dashboard.rule=Host(`${traefik_domain}`)"
+      - "traefik.http.routers.http-dashboard.entrypoints=web"
+      - "traefik.http.routers.dashboard.rule=Host(`${traefik_domain}`)"
+      - "traefik.http.routers.dashboard.entrypoints=web-secure"
+      # - "traefik.http.routers.dashboard.middlewares=web-auth@docker"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=myproduction"
+      - "traefik.http.services.dashboard.loadBalancer.server.port=8080"
+    networks:
+      - web_net
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  traefik_data:
+    name: traefik_data
+    external: false
+

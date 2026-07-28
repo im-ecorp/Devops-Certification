@@ -43,7 +43,7 @@ docker_gpg_key_path: /etc/apt/keyrings/docker.asc
 
 docker_config:
   proxy:
-    enabled: true
+    enabled: false
     http_proxy: "http://127.0.0.1:8090"
     https_proxy: "{{ docker_config.proxy.http_proxy }}"
     no_proxy: "hub.mecan.ir, 127.0.0.1/8, localhost"

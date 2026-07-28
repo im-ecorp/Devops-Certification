@@ -1,0 +1,17 @@
+---
+#treafik image tag
+traefik_image_tag: v3.7.9
+
+#traefik sub domain 
+traefik_domain: "traefik.{{ main_domain }}"
+
+#traefik restart policy
+restart_policy: "on-failure"
+
+#traefik email for acme challenge
+acme_email: hossein3piol@proton.me
+
+#traefik service directory
+service_dir: "{{ project_dir }}/traefik"
+
+
