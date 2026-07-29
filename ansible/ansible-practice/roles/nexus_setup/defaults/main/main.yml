@@ -30,14 +30,61 @@ create_blob_stores:
   - docker
   - raw
 
-# List of APT proxy repositories to create
+# List of cleanup policies to create
+create_cleanup_policies:
+  - name: apt
+    format: apt
+    criteria_last_blob_updated: 30
+    criteria_last_downloaded: 90
+  - name: docker
+    format: docker
+    criteria_last_blob_updated: 30
+    criteria_last_downloaded: 90
+  - name: raw
+    format: raw
+    criteria_last_blob_updated: 30
+    criteria_last_downloaded: 90
+  - name: pypi
+    format: pypi
+    criteria_last_blob_updated: 30
+    criteria_last_downloaded: 90
 
+# List of APT proxy repositories to create
 create_apt_proxy_repos:
-  - name: ubuntu-proxy
+  # Ubuntu
+  - name: "ubuntu"
     remote_url: "http://archive.ubuntu.com/ubuntu/"
-    distribution: "jammy"
+    distribution: "focal,focal-updates,focal-backports,jammy,jammy-updates,jammy-backports,noble,noble-updates,noble-backports"
     blob_store: "apt"
-  # - name: debian-proxy
-  #   remote_url: "http://deb.debian.org/debian/"
-  #   distribution: "bookworm"
-  #   blob_store: "apt"
+    cleanup_policy: "apt"
+
+  - name: "ubuntu-security"
+    remote_url: "http://security.ubuntu.com/ubuntu/"
+    distribution: "focal-security,jammy-security,noble-security"
+    blob_store: "apt"
+    cleanup_policy: "apt"
+
+  - name: "ubuntu-docker"
+    remote_url: "https://download.docker.com/linux/ubuntu"
+    distribution: "focal,jammy,noble"
+    blob_store: "apt"
+    cleanup_policy: "apt"
+
+  # Debian
+  - name: "debian"
+    remote_url: "http://deb.debian.org/debian/"
+    distribution: "bullseye,bullseye-updates,bookworm,bookworm-updates,trixie,trixie-updates"
+    blob_store: "apt"
+    cleanup_policy: "apt"
+
+  - name: "debian-security"
+    remote_url: "http://security.debian.org/debian-security/"
+    distribution: "bullseye-security,bookworm-security,trixie-security"
+    blob_store: "apt"
+    cleanup_policy: "apt"
+
+  - name: "debian-docker"
+    remote_url: "https://download.docker.com/linux/debian/"
+    distribution: "bullseye,bookworm,trixie"
+    blob_store: "apt"
+    cleanup_policy: "apt"

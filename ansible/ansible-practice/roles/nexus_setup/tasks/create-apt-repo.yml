@@ -34,7 +34,7 @@
             strictContentTypeValidation: true
             writePolicy: ALLOW_ONCE
           cleanup:
-            policyNames: []
+            policyNames: "{{ [item.cleanup_policy] if item.cleanup_policy is defined and item.cleanup_policy else [] }}"
           proxy:
             remoteUrl: "{{ item.remote_url }}"
             contentMaxAge: 1440

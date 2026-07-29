@@ -1,0 +1,55 @@
+---
+
+- name: "Create cleanup policy: {{ item.name }}"
+  block:
+    - name: Check if cleanup policy exists
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/internal/cleanup-policies/{{ item.name }}"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code:
+          - 200
+          - 404
+      register: policy_check
+
+    - name: Create cleanup policy
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/internal/cleanup-policies"
+        method: POST
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          format: "{{ item.format }}"
+          notes: "{{ item.notes | default('') }}"
+          criteriaLastBlobUpdated: "{{ item.criteria_last_blob_updated | default(omit) }}"
+          criteriaLastDownloaded: "{{ item.criteria_last_downloaded | default(omit) }}"
+          criteriaAssetRegex: "{{ item.criteria_asset_regex | default(omit) }}"
+        status_code:
+          - 200
+          - 201
+      when: policy_check.status == 404
+
+  rescue:
+    - name: Handle cleanup policy creation failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to create cleanup policy '{{ item.name }}'.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Cleanup policy creation for '{{ item.name }}' failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_cleanup_policy

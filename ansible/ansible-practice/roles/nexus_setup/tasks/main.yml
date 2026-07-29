@@ -26,6 +26,16 @@
     - config_nexus
     - create_blob_store
 
+- name: Configuration Nexus | Create cleanup policy
+  ansible.builtin.include_tasks: create-cleanup-policy.yml
+  loop: "{{ create_cleanup_policies }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_cleanup_policy
+
 - name: Configuration Nexus | Create APT repo
   ansible.builtin.include_tasks: create-apt-repo.yml
   loop: "{{ create_apt_proxy_repos }}"
