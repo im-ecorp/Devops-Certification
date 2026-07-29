@@ -1,8 +1,8 @@
 ---
-- name: Deploy Nexus Repository behind Traefik
-  hosts: nexus
+
+- name: Install and configure Nexus service
+  hosts: all
   become: true
   gather_facts: true
   roles:
-    - role: docker
-    - role: nexus
+    - nexus_setup

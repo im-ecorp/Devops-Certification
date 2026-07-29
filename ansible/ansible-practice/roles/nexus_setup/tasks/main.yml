@@ -1,16 +1,37 @@
 ---
-- name: Validate Nexus deployment inputs
-  ansible.builtin.assert:
-    that:
-      - nexus_domain | length > 0
-      - nexus_traefik_network | length > 0
-      - nexus_image | length > 0
-      - nexus_java_xms | length > 0
-      - nexus_java_xmx | length > 0
-    fail_msg: Set nexus_domain, nexus_traefik_network, nexus_image, nexus_java_xms, and nexus_java_xmx.
 
-- name: Deploy Nexus and Traefik configuration
-  ansible.builtin.import_tasks: deploy.yml
+- name: Setup Nexus Service
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_nexus
+    - setup_nexus
 
-- name: Verify Nexus is reachable through Traefik
-  ansible.builtin.import_tasks: verify.yml
+- name: Configuration Nexus | Delete repo
+  ansible.builtin.include_tasks: delete-repo.yml
+  loop: "{{ delete_repos }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - delete_repository
+
+- name: Configuration Nexus | Create blob store
+  ansible.builtin.include_tasks: create-blob-store.yml
+  loop: "{{ create_blob_stores }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_blob_store
+
+- name: Configuration Nexus | Create APT repo
+  ansible.builtin.include_tasks: create-apt-repo.yml
+  loop: "{{ create_apt_proxy_repos }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_apt_repo

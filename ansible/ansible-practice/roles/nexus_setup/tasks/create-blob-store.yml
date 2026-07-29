@@ -1,0 +1,49 @@
+---
+
+- name: "Create blob store: {{ item }}"
+  block:
+    - name: Check if blob store exists
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/v1/blobstores/file/{{ item }}"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code:
+          - 200
+          - 404
+      register: blob_check
+
+    - name: Create file blob store
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/v1/blobstores/file"
+        method: POST
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ item }}"
+          path: "{{ item }}"
+        status_code: 204
+      when: blob_check.status == 404
+
+  rescue:
+    - name: Handle blob store creation failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to create blob store '{{ item }}'.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Blob store creation for '{{ item }}' failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_blob_store

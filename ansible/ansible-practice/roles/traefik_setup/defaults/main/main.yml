@@ -1,6 +1,6 @@
 ---
 #treafik image tag
-traefik_image_tag: v3.7.9
+traefik_image_tag: "v3.7.9"
 
 #traefik sub domain 
 traefik_domain: "traefik.{{ main_domain }}"
