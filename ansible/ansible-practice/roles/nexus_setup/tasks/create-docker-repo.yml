@@ -1,0 +1,71 @@
+---
+
+- name: "Create Docker proxy repository: {{ item.name }}"
+  block:
+    - name: Check if Docker repository exists
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/{{ item.name }}"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code:
+          - 200
+          - 404
+      register: repo_check
+
+    - name: Create Docker proxy repository
+      ansible.builtin.uri:
+        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/docker/proxy"
+        method: POST
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          online: true
+          storage:
+            blobStoreName: "{{ item.blob_store }}"
+            strictContentTypeValidation: true
+          cleanup:
+            policyNames: "{{ [item.cleanup_policy] if item.cleanup_policy is defined and item.cleanup_policy else [] }}"
+          docker:
+            v1Enabled: "{{ item.v1_enabled | default(false) }}"
+            forceBasicAuth: "{{ item.force_basic_auth | default(true) }}"
+            httpPort: "{{ item.http_port | default(omit) }}"
+            httpsPort: "{{ item.https_port | default(omit) }}"
+          dockerProxy:
+            indexType: "{{ item.index_type | default('REGISTRY') }}"
+          proxy:
+            remoteUrl: "{{ item.remote_url }}"
+            contentMaxAge: 1440
+            metadataMaxAge: 1440
+          negativeCache:
+            enabled: true
+            timeToLive: 1440
+          httpClient:
+            blocked: false
+            autoBlock: true
+        status_code: 201
+      when: repo_check.status == 404
+
+  rescue:
+    - name: Handle Docker repository creation failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to create Docker proxy repository '{{ item.name }}'.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Docker proxy repository creation for '{{ item.name }}' failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_docker_repo

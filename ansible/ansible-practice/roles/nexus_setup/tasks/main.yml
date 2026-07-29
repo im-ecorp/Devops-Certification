@@ -38,10 +38,20 @@
 
 - name: Configuration Nexus | Create APT repo
   ansible.builtin.include_tasks: create-apt-repo.yml
-  loop: "{{ create_apt_proxy_repos }}"
+  loop: "{{ create_apt_repository }}"
   loop_control:
     loop_var: item
   tags:
     - setup_nexus
     - config_nexus
     - create_apt_repo
+
+- name: Configuration Nexus | Create Docker repo
+  ansible.builtin.include_tasks: create-docker-repo.yml
+  loop: "{{ create_docker_repository }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_docker_repo
