@@ -1,0 +1,101 @@
+---
+
+- name: Create custom role
+  block:
+    - name: Get all roles
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/roles"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: role_check
+
+    - name: Create custom role
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/roles"
+        method: POST
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          id: "{{ auth_config.role.name }}"
+          name: "{{ auth_config.role.name }}"
+          description: "{{ auth_config.role.description }}"
+          privileges: "{{ auth_config.role.privileges }}"
+          roles: "{{ auth_config.role.roles | default([]) }}"
+        status_code: 200
+      when: auth_config.role.name not in (role_check.json | map(attribute='id') | list)
+
+  rescue:
+    - name: Handle role creation failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to create role '{{ auth_config.role.name }}'.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Role creation for '{{ auth_config.role.name }}' failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - auth_config
+
+- name: Create user with role assigned
+  block:
+    - name: Get all users
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/users"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: user_check
+
+    - name: Create user
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/users"
+        method: POST
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          userId: "{{ auth_config.user.user_id }}"
+          firstName: "{{ auth_config.user.first_name }}"
+          lastName: "{{ auth_config.user.last_name }}"
+          emailAddress: "{{ auth_config.user.email }}"
+          password: "{{ auth_config.user.password }}"
+          status: "{{ auth_config.user.status | default('active') }}"
+          roles: "{{ auth_config.user.roles }}"
+        status_code: 200
+      when: auth_config.user.user_id not in (user_check.json | map(attribute='userId') | list)
+
+  rescue:
+    - name: Handle user creation failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to create user '{{ auth_config.user.user_id }}'.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "User creation for '{{ auth_config.user.user_id }}' failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - auth_config

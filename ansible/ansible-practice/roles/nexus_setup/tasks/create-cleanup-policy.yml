@@ -4,7 +4,7 @@
   block:
     - name: Check if cleanup policy exists
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/internal/cleanup-policies/{{ item.name }}"
+        url: "{{ nexus_main_url }}/service/rest/internal/cleanup-policies/{{ item.name }}"
         method: GET
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
@@ -17,7 +17,7 @@
 
     - name: Create cleanup policy
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/internal/cleanup-policies"
+        url: "{{ nexus_main_url }}/service/rest/internal/cleanup-policies"
         method: POST
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"

@@ -11,7 +11,8 @@ service_dir: "{{ project_dir }}/nexus"
 
 # Domain names
 nexus_main_domain: "repo.{{ main_domain }}"
-nexus_hub_domain: "hub.{{ main_domain }}"
+nexus_main_url: "https://{{ nexus_main_domain }}"
+
 
 # List of repositories to delete
 delete_repos:
@@ -22,6 +23,37 @@ delete_repos:
   - nuget-hosted
   - nuget-group
   - nuget.org-proxy
+
+# Auth configuration
+auth_config:
+  role:
+    name: "nx-deploy"
+    description: "Deployment role with read and write access"
+    privileges:
+      - "nx-repository-view-*-*-*"
+    roles:
+      - "nx-anonymous"
+
+  user:
+    first_name: "Deploy"
+    last_name: "User"
+    email: "deploy@example.com"
+    user_id: "deploy"
+    password: "{{ nexus_deploy_user_password }}"
+    status: "active"
+    roles:
+      - "nx-deploy"
+
+# Anonymous access configuration
+anonymous_config:
+  enabled: true
+  user_id: "anonymous"
+  realm_name: "NexusAuthorizingRealm"
+
+# List of realms to enable
+realms_config:
+  - name: "Docker Bearer Token"
+    id: "DockerToken"
 
 
 # List of blob stores to create
@@ -73,7 +105,7 @@ create_apt_repository:
   # Debian
   - name: "debian"
     remote_url: "http://deb.debian.org/debian/"
-    distribution: "bullseye,bullseye-updates,bookworm,bookworm-updates,trixie,trixie-updates"
+    distribution: "bullseye,bullseye-updates,bullseye-backports,bookworm,bookworm-updates,bookworm-backports,trixie,trixie-updates,trixie-backports"
     blob_store: "apt"
     cleanup_policy: "apt"
 
@@ -99,3 +131,70 @@ create_docker_repository:
     http_port: "9091"
     force_basic_auth: false
     v1_enabled: true
+    repo_domain: "hub.{{ main_domain }}"
+
+  - name: "quay"
+    remote_url: "https://quay.io/"  #https://quay-mirror.liara.ir
+    blob_store: "docker"
+    cleanup_policy: "docker"
+    index_type: "REGISTRY"
+    http_port: "9092"
+    force_basic_auth: false
+    v1_enabled: true
+    repo_domain: "quay.{{ main_domain }}"
+
+  - name: "k8s"
+    remote_url: "https://registry.k8s.io"
+    blob_store: "docker"
+    cleanup_policy: "docker"
+    index_type: "REGISTRY"
+    http_port: "9093"
+    force_basic_auth: false
+    v1_enabled: true
+    repo_domain: "k8s.{{ main_domain }}"
+
+  - name: "gcr"
+    remote_url: "https://gcr.io"
+    blob_store: "docker"
+    cleanup_policy: "docker"
+    index_type: "REGISTRY"
+    http_port: "9094"
+    force_basic_auth: false
+    v1_enabled: true
+    repo_domain: "gcr.{{ main_domain }}"
+
+  - name: "k8s-gcr"
+    remote_url: "https://k8s.gcr.io"
+    blob_store: "docker"
+    cleanup_policy: "docker"
+    index_type: "REGISTRY"
+    http_port: "9095"
+    force_basic_auth: false
+    v1_enabled: true
+    repo_domain: "k8s-gcr.{{ main_domain }}"
+
+  - name: "github"
+    remote_url: "https://ghcr.io"
+    blob_store: "docker"
+    cleanup_policy: "docker"
+    index_type: "REGISTRY"
+    http_port: "9096"
+    force_basic_auth: false
+    v1_enabled: true
+    repo_domain: "github.{{ main_domain }}"
+
+# List of Raw proxy repositories to create
+create_raw_repository:
+  - name: "kube"
+    remote_url: "https://files.m.daocloud.io"
+    blob_store: "raw"
+    cleanup_policy: "raw"
+    content_disposition: "INLINE"
+
+# List of Pypi proxy repositories to create
+create_pypi_repository:
+  - name: "pypi"
+    remote_url: "https://pypi.org/"
+    blob_store: "raw"
+    cleanup_policy: "pypi"
+

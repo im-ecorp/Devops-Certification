@@ -3,5 +3,4 @@
 - name: Restart Nexus
   community.docker.docker_compose_v2:
     project_src: "{{ service_dir }}"
-    state: present
-    restarted: true
+    state: restarted

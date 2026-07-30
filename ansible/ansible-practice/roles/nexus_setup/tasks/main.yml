@@ -55,3 +55,47 @@
     - setup_nexus
     - config_nexus
     - create_docker_repo
+
+- name: Configuration Nexus | Create Raw repo
+  ansible.builtin.include_tasks: create-raw-repo.yml
+  loop: "{{ create_raw_repository }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_raw_repo
+
+- name: Configuration Nexus | Create PyPI repo
+  ansible.builtin.include_tasks: create-pypi-repo.yml
+  loop: "{{ create_pypi_repository }}"
+  loop_control:
+    loop_var: item
+  tags:
+    - setup_nexus
+    - config_nexus
+    - create_pypi_repo
+
+- name: Configuration Nexus | Enable Anonymous Access
+  ansible.builtin.include_tasks: anonymous-config.yml
+  tags:
+    - setup_nexus
+    - config_nexus
+    - anonymous_access
+
+- name: Configuration Nexus | Configure Realms
+  ansible.builtin.include_tasks: realms-config.yml
+  loop: "{{ realms_config }}"
+  loop_control:
+    loop_var: realm_config
+  tags:
+    - setup_nexus
+    - config_nexus
+    - realms_config
+
+- name: Configuration Nexus | Auth Configuration | Create Role and User
+  ansible.builtin.include_tasks: auth-config.yml
+  tags:
+    - setup_nexus
+    - config_nexus
+    - auth_config

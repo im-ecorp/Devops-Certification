@@ -4,7 +4,7 @@
   block:
     - name: Check if repository exists
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/{{ item }}"
+        url: "{{ nexus_main_url }}/service/rest/v1/repositories/{{ item }}"
         method: GET
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
@@ -15,15 +15,9 @@
           - 404
       register: repo_check
 
-    # - name: Show repository check result
-    #   ansible.builtin.debug:
-    #     msg: >-
-    #       Repository '{{ item }}' check returned status {{ repo_check.status }}.
-    #       {{ 'Will proceed with deletion.' if repo_check.status == 200 else 'Repository not found, skipping deletion.' }}
-
     - name: Delete repository
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/{{ item }}"
+        url: "{{ nexus_main_url }}/service/rest/v1/repositories/{{ item }}"
         method: DELETE
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
@@ -31,11 +25,6 @@
         validate_certs: false
         status_code: 204
       when: repo_check.status == 200
-
-    # - name: Display skip message if repository does not exist
-    #   ansible.builtin.debug:
-    #     msg: "Repository '{{ item }}' does not exist in Nexus. Skipping deletion."
-    #   when: repo_check.status == 404
 
   rescue:
     - name: Handle deletion failure

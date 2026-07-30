@@ -4,7 +4,7 @@
   block:
     - name: Check if Docker repository exists
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/{{ item.name }}"
+        url: "{{ nexus_main_url }}/service/rest/v1/repositories/{{ item.name }}"
         method: GET
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
@@ -17,7 +17,7 @@
 
     - name: Create Docker proxy repository
       ansible.builtin.uri:
-        url: "https://{{ nexus_main_domain }}/service/rest/v1/repositories/docker/proxy"
+        url: "{{ nexus_main_url }}/service/rest/v1/repositories/docker/proxy"
         method: POST
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
@@ -53,6 +53,45 @@
             autoBlock: true
         status_code: 201
       when: repo_check.status == 404
+
+    - name: Update Docker proxy repository
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/repositories/docker/proxy/{{ item.name }}"
+        method: PUT
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          online: true
+          storage:
+            blobStoreName: "{{ item.blob_store }}"
+            strictContentTypeValidation: true
+          cleanup:
+            policyNames: "{{ [item.cleanup_policy] if item.cleanup_policy is defined and item.cleanup_policy else [] }}"
+          docker:
+            v1Enabled: "{{ item.v1_enabled | default(false) }}"
+            forceBasicAuth: "{{ item.force_basic_auth | default(true) }}"
+            httpPort: "{{ item.http_port | default(omit) }}"
+            httpsPort: "{{ item.https_port | default(omit) }}"
+          dockerProxy:
+            indexType: "{{ item.index_type | default('REGISTRY') }}"
+          proxy:
+            remoteUrl: "{{ item.remote_url }}"
+            contentMaxAge: 1440
+            metadataMaxAge: 1440
+          negativeCache:
+            enabled: true
+            timeToLive: 1440
+          httpClient:
+            blocked: false
+            autoBlock: true
+        status_code: 204
+      when: repo_check.status == 200
 
   rescue:
     - name: Handle Docker repository creation failure

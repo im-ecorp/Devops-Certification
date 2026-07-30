@@ -1,24 +1,22 @@
 ---
 
-- name: "Create blob store: {{ item }}"
+- name: "Configure Realms: {{ realm_config.name }}"
   block:
-    - name: Check if blob store exists
+    - name: Get active realms
       ansible.builtin.uri:
-        url: "{{ nexus_main_url }}/service/rest/v1/blobstores/file/{{ item }}"
+        url: "{{ nexus_main_url }}/service/rest/v1/security/realms/active"
         method: GET
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
         force_basic_auth: true
         validate_certs: false
-        status_code:
-          - 200
-          - 404
-      register: blob_check
+        status_code: 200
+      register: realms_check
 
-    - name: Create file blob store
+    - name: Enable realm
       ansible.builtin.uri:
-        url: "{{ nexus_main_url }}/service/rest/v1/blobstores/file"
-        method: POST
+        url: "{{ nexus_main_url }}/service/rest/v1/security/realms/active"
+        method: PUT
         user: "{{ nexus_user }}"
         password: "{{ nexus_password }}"
         force_basic_auth: true
@@ -26,24 +24,22 @@
         headers:
           Content-Type: "application/json"
         body_format: json
-        body:
-          name: "{{ item }}"
-          path: "{{ item }}"
+        body: "{{ realms_check.json + [realm_config.id] }}"
         status_code: 204
-      when: blob_check.status == 404
+      when: realm_config.id not in realms_check.json
 
   rescue:
-    - name: Handle blob store creation failure
+    - name: Handle realm configuration failure
       ansible.builtin.debug:
         msg: >-
-          Failed to create blob store '{{ item }}'.
+          Failed to configure realm '{{ realm_config.name }}'.
           Error: {{ ansible_failed_result.msg | default('unknown error') }}
 
     - name: Fail with explicit message
       ansible.builtin.fail:
-        msg: "Blob store creation for '{{ item }}' failed. See above for details."
+        msg: "Realm configuration for '{{ realm_config.name }}' failed. See above for details."
 
   tags:
     - setup_nexus
     - config_nexus
-    - create_blob_store
+    - realms_config

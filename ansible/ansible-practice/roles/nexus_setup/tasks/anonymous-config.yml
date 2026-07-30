@@ -1,0 +1,48 @@
+---
+
+- name: Enable Anonymous Access
+  block:
+    - name: Check anonymous access status
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/anonymous"
+        method: GET
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: anonymous_check
+
+    - name: Enable anonymous access
+      ansible.builtin.uri:
+        url: "{{ nexus_main_url }}/service/rest/v1/security/anonymous"
+        method: PUT
+        user: "{{ nexus_user }}"
+        password: "{{ nexus_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          enabled: "{{ anonymous_config.enabled }}"
+          userId: "{{ anonymous_config.user_id }}"
+          realmName: "{{ anonymous_config.realm_name }}"
+        status_code: 200
+      when: not anonymous_check.json.enabled | default(false)
+
+  rescue:
+    - name: Handle anonymous access configuration failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to configure anonymous access.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Anonymous access configuration failed. See above for details."
+
+  tags:
+    - setup_nexus
+    - config_nexus
+    - anonymous_access
