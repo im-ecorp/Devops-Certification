@@ -1,0 +1,7 @@
+---
+
+- name: Setup RustFS Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_rustfs
+    - setup_rustfs

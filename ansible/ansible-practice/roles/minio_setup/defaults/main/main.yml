@@ -1,0 +1,15 @@
+---
+# Default variables for MinIO setup
+
+# Docker image tag for MinIO
+minio_image_tag: "RELEASE.2025-05-24T17-08-30Z"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/minio"
+
+# MinIO domains (used by reverse proxy)
+minio_api_domain: "minio-api.{{ main_domain }}"
+minio_console_domain: "minio.{{ main_domain }}"

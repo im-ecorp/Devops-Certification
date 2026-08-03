@@ -1,0 +1,57 @@
+
+services:
+  rustfs:
+    image: rustfs/rustfs:${image_tag}
+    container_name: rustfs
+    hostname: rustfs
+    restart: ${restart_policy}
+    volumes:
+      - rustfs_data:/data
+      - rustfs_logs:/logs
+    environment:
+      RUSTFS_ACCESS_KEY: ${rustfs_root_user}
+      RUSTFS_SECRET_KEY: ${rustfs_root_password}
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_SERVER_DOMAINS: ${rustfs_console_domain}
+      RUSTFS_OBS_LOG_DIRECTORY: /logs
+    networks: 
+      - web_net
+      - app_net
+    healthcheck:
+      test: ["CMD", "sh", "-ec", "curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.http-rustfs-console.rule=Host(`${rustfs_console_domain}`)"
+      - "traefik.http.routers.http-rustfs-console.entrypoints=web"
+      - "traefik.http.routers.rustfs-console.rule=Host(`${rustfs_console_domain}`)"
+      - "traefik.http.routers.rustfs-console.entrypoints=web-secure"
+      - "traefik.http.routers.rustfs-console.tls=true"
+      - "traefik.http.routers.rustfs-console.tls.certresolver=myproduction"
+      - "traefik.http.routers.rustfs-console.service=rustfs-console"
+      - "traefik.http.services.rustfs-console.loadBalancer.server.port=9001"
+      - "traefik.http.routers.http-rustfs-api.rule=Host(`${rustfs_api_domain}`)"
+      - "traefik.http.routers.http-rustfs-api.entrypoints=web"
+      - "traefik.http.routers.rustfs-api.rule=Host(`${rustfs_api_domain}`)"
+      - "traefik.http.routers.rustfs-api.entrypoints=web-secure"
+      - "traefik.http.routers.rustfs-api.tls=true"
+      - "traefik.http.routers.rustfs-api.tls.certresolver=myproduction"
+      - "traefik.http.routers.rustfs-api.service=rustfs-api"
+      - "traefik.http.services.rustfs-api.loadBalancer.server.port=9000"
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  rustfs_data:
+    name: rustfs_data
+  rustfs_logs:
+    name: rustfs_logs

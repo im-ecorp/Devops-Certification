@@ -1,0 +1,17 @@
+---
+# Default variables for RustFS setup
+
+# Docker image version for RustFS
+rustfs_image_tag: "1.0.0-beta.12"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "unless-stopped"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/rustfs"
+
+# RustFS API domain (S3-compatible endpoint)
+rustfs_api_domain: "rustfs-api.{{ main_domain }}"
+
+# RustFS Console domain (Web UI)
+rustfs_console_domain: "rustfs.{{ main_domain }}"

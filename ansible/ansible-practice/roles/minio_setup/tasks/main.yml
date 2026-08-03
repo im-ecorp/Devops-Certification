@@ -1,0 +1,7 @@
+---
+
+- name: Setup Minio Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_minio
+    - setup_minio

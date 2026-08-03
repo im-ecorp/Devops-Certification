@@ -1,4 +1,5 @@
 ---
+# Default variables for Docker setup
 docker_dependencies:
   - acl
   - python3-ruamel.yaml

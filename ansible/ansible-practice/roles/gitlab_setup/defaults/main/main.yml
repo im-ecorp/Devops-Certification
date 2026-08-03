@@ -1,0 +1,40 @@
+---
+# Default variables for GitLab setup
+
+# Docker image version for GitLab CE
+gitlab_image_tag: "19.2.1-ce.0"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/gitlab"
+
+# Domain name for GitLab
+gitlab_main_domain: "git.{{ main_domain }}"
+
+gitlab_registry_domain: "reg.{{ main_domain }}"
+
+# SMTP server settings
+gitlab_smtp_enable: true
+gitlab_smtp_address: "smtp.gmail.com"
+gitlab_smtp_domain: "{{ gitlab_smtp_address }}"
+gitlab_smtp_port: 587
+
+# Rate limiting — IPs that bypass RackAttack
+gitlab_ip_whitelist:
+  - "127.0.0.1"
+  - "94.182.18.26"
+  - "89.167.72.70"
+
+# List of runners to configure
+gitlab_runners: []
+  # - name: "shared-runner-1"
+  #   token: "{{ gitlab_runner_token }}"
+  #   description: "Shared CI runner"
+  #   tags:
+  #     - docker
+  #     - linux
+  #   run_untagged: true
+  #   locked: false
+  #   max_timeout: 3600

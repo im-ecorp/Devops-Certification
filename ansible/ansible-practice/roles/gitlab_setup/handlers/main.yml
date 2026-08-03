@@ -1,0 +1,6 @@
+---
+
+- name: Restart GitLab
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    state: restarted

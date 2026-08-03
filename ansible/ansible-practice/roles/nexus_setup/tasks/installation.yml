@@ -23,8 +23,8 @@
 
 - name: Copy Docker Compose file
   ansible.builtin.template:
-    src: compose.yml.j2
-    dest: "{{ service_dir }}/compose.yml"
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
     mode: "0644"
   notify: Restart Nexus
   tags:

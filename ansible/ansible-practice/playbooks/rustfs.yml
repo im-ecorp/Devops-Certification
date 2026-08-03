@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure rustfs service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - rustfs_setup
