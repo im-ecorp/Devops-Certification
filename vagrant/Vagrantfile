@@ -1,35 +1,66 @@
-IMAGE1 = "debian/bookworm64"
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
 
-ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+# ---------------------------------------------------------------------------
+# Debian 13 "Trixie" multi-node lab (VirtualBox)
+#
+# Box choice:
+#   The official "debian/trixie64" box currently publishes a *libvirt-only*
+#   provider (no VirtualBox build). Because this file targets VirtualBox, we
+#   use the actively maintained, VirtualBox-compatible "bento/debian-13" box.
+#   If you switch to the libvirt provider, set BOX_IMAGE = "debian/trixie64".
+#
+# Usage:
+#   vagrant up                 # create/boot all nodes
+#   vagrant ssh vmbox11        # log into a node
+#   vagrant box update         # pull newer Debian 13 point releases
+#   vagrant destroy -f         # tear everything down
+# ---------------------------------------------------------------------------
 
-Vagrant.configure(2) do |config|
+BOX_IMAGE = "bento/debian-13"
 
-  NodeType1 = 1
-  (1..NodeType1).each do |no1_id|
+# Single source of truth for the cluster. Add/remove/resize nodes here.
+NODES = [
+  { name: "vmbox11", ip: "192.168.56.111", cpus: 1, memory: 1024 },
+  { name: "vmbox12", ip: "192.168.56.112", cpus: 1, memory: 1024 },
+  { name: "vmbox13", ip: "192.168.56.113", cpus: 1, memory: 1024 },
+].freeze
 
-    config.vm.define "vmbox1#{no1_id}" do |vmbox1|
-      vmbox1.vm.box = IMAGE1
-      vmbox1.vm.hostname = "vmbox1#{no1_id}"
-      vmbox1.vm.network "private_network", ip: "192.168.56.11#{no1_id}"
-      vmbox1.vm.provider "virtualbox" do |v|
-        v.name = "vbox#{no1_id}"
-        v.memory = 1024
-        v.cpus = 1
+# Bring machines up one at a time for deterministic ordering.
+ENV["VAGRANT_NO_PARALLEL"] = "yes"
+
+# /etc/hosts entries so every node can resolve the others by hostname.
+HOSTS_BLOCK = NODES.map { |n| "#{n[:ip]} #{n[:name]}" }.join('\n')
+
+Vagrant.configure("2") do |config|
+  # Shared settings applied to every node.
+  config.vm.box = BOX_IMAGE
+  # Skip the online "newer box?" check on each up; run `vagrant box update`
+  # manually when you want a fresher Debian 13 point release.
+  config.vm.box_check_update = false
+
+  NODES.each do |node|
+    config.vm.define node[:name] do |vm|
+      vm.vm.hostname = node[:name]
+      vm.vm.network "private_network", ip: node[:ip]
+
+      vm.vm.provider "virtualbox" do |vb|
+        vb.name         = node[:name]
+        vb.memory       = node[:memory]
+        vb.cpus         = node[:cpus]
+        vb.linked_clone = true # faster creation, less disk usage
       end
+
+      # Idempotently register all cluster hostnames in /etc/hosts.
+      vm.vm.provision "shell", inline: <<~SHELL
+        if ! grep -q "# vagrant-cluster" /etc/hosts; then
+          {
+            echo ""
+            echo "# vagrant-cluster"
+            printf '%b\\n' "#{HOSTS_BLOCK}"
+          } >> /etc/hosts
+        fi
+      SHELL
     end
   end
-
-  NodeType2 = 2
-  (1..NodeType2).each do |no2_id|
-    config.vm.define "vmbox1#{no2_id}" do |vmbox2|
-      vmbox2.vm.box = IMAGE1
-      vmbox2.vm.hostname = "vmbox1#{no2_id}"
-      vmbox2.vm.network "private_network", ip: "192.168.56.11#{no2_id}"
-      vmbox2.vm.provider "virtualbox" do |v|
-        v.name = "vbox#{no2_id}"
-        v.memory = 1024
-        v.cpus = 1
-      end
-    end
-  end  
 end
