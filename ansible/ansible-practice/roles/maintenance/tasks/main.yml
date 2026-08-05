@@ -1,0 +1,16 @@
+---
+
+- name: Update and Upgrade packages
+  import_tasks: update-os.yml
+  tags:
+    - update_os
+
+- name: Clean up Docker resources
+  import_tasks: docker-cleanup.yml
+  tags:
+    - docker_cleanup
+
+- name: Update Kubernetes tools
+  import_tasks: k8s-tools.yml
+  tags:
+    - k8s_tools

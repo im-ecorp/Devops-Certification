@@ -1,0 +1,135 @@
+---
+# Step 4: Create the Kind cluster
+
+- name: Ensure project directory exists
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Template Kind configuration
+  ansible.builtin.template:
+    src: kind-config.yaml.j2
+    dest: "{{ service_dir }}/kind-config.yaml"
+    mode: "0644"
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Check if Kind cluster already exists
+  ansible.builtin.command:
+    argv:
+      - kind
+      - get
+      - clusters
+  register: existing_clusters
+  changed_when: false
+  failed_when: false
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Inspect existing Kind control-plane host port mappings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - "{{ awx_cluster_name }}-control-plane"
+      - --format
+      - "{{ '{{json .HostConfig.PortBindings}}' }}"
+  register: awx_existing_kind_ports_raw
+  changed_when: false
+  when: awx_cluster_name in existing_clusters.stdout_lines
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Parse existing Kind control-plane port mappings
+  ansible.builtin.set_fact:
+    awx_existing_kind_ports: >-
+      {{ awx_existing_kind_ports_raw.stdout | from_json | default({}, true) }}
+  when: awx_cluster_name in existing_clusters.stdout_lines
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Validate the existing Kind NodePort mapping
+  ansible.builtin.assert:
+    that:
+      - (awx_nodeport_port | string ~ '/tcp') in awx_existing_kind_ports
+      - >-
+        awx_existing_kind_ports[awx_nodeport_port | string ~ '/tcp']
+        | selectattr('HostIp', 'equalto', awx_nodeport_listen_address)
+        | selectattr('HostPort', 'equalto', awx_nodeport_port | string)
+        | list | length > 0
+      - "'80/tcp' not in awx_existing_kind_ports"
+      - "'443/tcp' not in awx_existing_kind_ports"
+    fail_msg: >-
+      Existing Kind cluster {{ awx_cluster_name }} does not have the required
+      {{ awx_nodeport_listen_address }}:{{ awx_nodeport_port }} NodePort mapping,
+      or still publishes obsolete ingress ports. Intentionally recreate the
+      cluster before continuing.
+  when: awx_cluster_name in existing_clusters.stdout_lines
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Verify the AWX NodePort is available before cluster creation
+  ansible.builtin.wait_for:
+    host: "{{ awx_nodeport_listen_address }}"
+    port: "{{ awx_nodeport_port }}"
+    state: stopped
+    timeout: 1
+    msg: "TCP port {{ awx_nodeport_port }} is already in use"
+  when: awx_cluster_name not in existing_clusters.stdout_lines
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Create Kind cluster
+  when: awx_cluster_name not in existing_clusters.stdout_lines
+  ansible.builtin.command:
+    argv:
+      - kind
+      - create
+      - cluster
+      - --name
+      - "{{ awx_cluster_name }}"
+      - --config
+      - "{{ service_dir }}/kind-config.yaml"
+  register: cluster_creation
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Verify cluster info
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - cluster-info
+  register: cluster_info
+  changed_when: false
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Wait for all nodes to be Ready
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - wait
+      - --for=condition=Ready
+      - node
+      - --all
+      - --timeout=60s
+  changed_when: false
+  tags:
+    - create_cluster
+    - setup_awx

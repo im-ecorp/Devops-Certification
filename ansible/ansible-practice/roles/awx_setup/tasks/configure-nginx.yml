@@ -1,0 +1,158 @@
+---
+# Configure host Nginx as the public HTTPS reverse proxy for the loopback-only
+# AWX NodePort. A temporary HTTP site is required for the first Certbot run
+# because the final site references certificate files that do not exist yet.
+
+- name: Check whether Nginx is installed
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -v
+  register: awx_nginx_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Nginx when it is missing
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: awx_nginx_version.rc != 0
+
+- name: Check whether Certbot and its Nginx plugin are installed
+  ansible.builtin.command:
+    argv:
+      - certbot
+      - plugins
+  register: awx_certbot_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Certbot and its Nginx plugin when missing
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: >-
+    awx_certbot_version.rc != 0
+    or 'nginx' not in
+       ((awx_certbot_version.stdout | default('')) ~
+        (awx_certbot_version.stderr | default('')))
+
+- name: Ensure Nginx is enabled and running
+  ansible.builtin.service:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Ensure Nginx site directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ awx_nginx_sites_available_dir }}"
+    - "{{ awx_nginx_sites_enabled_dir }}"
+
+- name: Check whether the AWX certificate exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ awx_hostname }}/fullchain.pem"
+    follow: true
+  register: awx_certificate
+
+- name: Install temporary HTTP site for the initial certificate request
+  ansible.builtin.template:
+    src: nginx-awx-bootstrap.conf.j2
+    dest: "{{ awx_nginx_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not awx_certificate.stat.exists
+
+- name: Enable the temporary AWX HTTP site
+  ansible.builtin.file:
+    src: "{{ awx_nginx_config_path }}"
+    dest: "{{ awx_nginx_enabled_path }}"
+    state: link
+  when: not awx_certificate.stat.exists
+
+- name: Validate temporary Nginx configuration
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -t
+  changed_when: false
+  when: not awx_certificate.stat.exists
+
+- name: Reload Nginx for the initial certificate challenge
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  when: not awx_certificate.stat.exists
+
+- name: Request and install the AWX SSL certificate
+  ansible.builtin.command:
+    argv:
+      - certbot
+      - --nginx
+      - --non-interactive
+      - --agree-tos
+      - --email
+      - "{{ awx_certbot_email }}"
+      - --redirect
+      - --domain
+      - "{{ awx_hostname }}"
+  when: not awx_certificate.stat.exists
+
+- name: Verify required AWX SSL files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - "/etc/letsencrypt/live/{{ awx_hostname }}/fullchain.pem"
+    - "/etc/letsencrypt/live/{{ awx_hostname }}/privkey.pem"
+    - /etc/letsencrypt/options-ssl-nginx.conf
+    - /etc/letsencrypt/ssl-dhparams.pem
+  register: awx_ssl_files
+
+- name: Assert all required AWX SSL files exist
+  ansible.builtin.assert:
+    that:
+      - awx_ssl_files.results | map(attribute='stat.exists') | min
+    fail_msg: >-
+      The AWX certificate or Certbot Nginx support files are missing; the final
+      TLS site cannot be enabled safely.
+
+- name: Install the AWX WebSocket map
+  ansible.builtin.template:
+    src: nginx-awx-websocket-map.conf.j2
+    dest: "{{ awx_nginx_websocket_map_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Nginx
+
+- name: Install the final AWX Nginx site
+  ansible.builtin.template:
+    src: nginx-awx.conf.j2
+    dest: "{{ awx_nginx_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Nginx
+
+- name: Enable the final AWX Nginx site
+  ansible.builtin.file:
+    src: "{{ awx_nginx_config_path }}"
+    dest: "{{ awx_nginx_enabled_path }}"
+    state: link
+  notify: Reload Nginx
+
+- name: Apply the validated AWX Nginx configuration now
+  ansible.builtin.meta: flush_handlers

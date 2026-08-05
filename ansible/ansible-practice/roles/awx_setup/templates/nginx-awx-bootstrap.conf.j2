@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name {{ awx_hostname }};
+
+    location / {
+        proxy_pass http://{{ awx_nodeport_listen_address }}:{{ awx_nodeport_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

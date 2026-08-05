@@ -1,0 +1,75 @@
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+
+metadata:
+  name: {{ awx_cluster_name | to_json }}
+  namespace: {{ awx_namespace | to_json }}
+
+spec:
+  service_type: {{ awx_service_type | to_json }}
+{% if awx_service_type | lower == 'nodeport' %}
+  nodeport_port: {{ awx_nodeport_port }}
+{% endif %}
+  ingress_type: none
+  admin_user: {{ awx_admin_user | to_json }}
+{% if awx_admin_password | length > 0 %}
+  admin_password_secret: {{ awx_admin_password_secret | to_json }}
+{% endif %}
+{% if awx_nginx_enabled %}
+  hostname: {{ awx_hostname | to_json }}
+  csrf_cookie_secure: "True"
+  session_cookie_secure: "True"
+{% endif %}
+
+  projects_persistence: {{ awx_projects_persistence | lower }}
+
+  web_replicas: {{ awx_web_replicas }}
+  task_replicas: {{ awx_task_replicas }}
+
+  web_resource_requirements:
+    requests:
+      cpu: {{ awx_web_requests_cpu | to_json }}
+      memory: {{ awx_web_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_web_limits_cpu | to_json }}
+      memory: {{ awx_web_limits_memory | to_json }}
+
+  task_resource_requirements:
+    requests:
+      cpu: {{ awx_task_requests_cpu | to_json }}
+      memory: {{ awx_task_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_task_limits_cpu | to_json }}
+      memory: {{ awx_task_limits_memory | to_json }}
+
+  redis_resource_requirements:
+    requests:
+      cpu: {{ awx_redis_requests_cpu | to_json }}
+      memory: {{ awx_redis_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_redis_limits_cpu | to_json }}
+      memory: {{ awx_redis_limits_memory | to_json }}
+
+  rsyslog_resource_requirements:
+    requests:
+      cpu: {{ awx_rsyslog_requests_cpu | to_json }}
+      memory: {{ awx_rsyslog_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_rsyslog_limits_cpu | to_json }}
+      memory: {{ awx_rsyslog_limits_memory | to_json }}
+
+  ee_resource_requirements:
+    requests:
+      cpu: {{ awx_ee_requests_cpu | to_json }}
+      memory: {{ awx_ee_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_ee_limits_cpu | to_json }}
+      memory: {{ awx_ee_limits_memory | to_json }}
+
+  postgres_resource_requirements:
+    requests:
+      cpu: {{ awx_postgres_requests_cpu | to_json }}
+      memory: {{ awx_postgres_requests_memory | to_json }}
+    limits:
+      cpu: {{ awx_postgres_limits_cpu | to_json }}
+      memory: {{ awx_postgres_limits_memory | to_json }}

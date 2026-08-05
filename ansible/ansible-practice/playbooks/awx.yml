@@ -1,0 +1,9 @@
+---
+# Playbook: Deploy AWX on Kind cluster
+
+- name: Deploy AWX on Kind cluster
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: awx_setup

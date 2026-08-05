@@ -1,0 +1,8 @@
+---
+- name: Maintenance servers
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - maintenance

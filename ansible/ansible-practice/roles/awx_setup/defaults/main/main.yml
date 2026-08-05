@@ -1,0 +1,88 @@
+---
+# Default variables for the AWX Kind test environment.
+
+awx_operator_version: "2.19.1"
+service_dir: "{{ project_dir }}/awx"
+
+awx_cluster_name: "awx"
+awx_namespace: "awx"
+awx_kubectl_context: "kind-{{ awx_cluster_name }}"
+
+# AWX uses a loopback-only NodePort mapped from the Kind control-plane to the
+# host. Host Nginx proxies the public HTTPS endpoint to this local port.
+awx_service_type: "nodeport"
+awx_nodeport_port: 32000
+awx_nodeport_listen_address: "127.0.0.1"
+
+awx_admin_user: "admin"
+awx_admin_password: ""
+awx_admin_password_secret: "{{ awx_cluster_name }}-admin-password"
+awx_display_admin_password: false
+
+# Host-level Nginx and Certbot integration.
+awx_nginx_enabled: true
+awx_hostname: "awx.k8sforfun.com"
+awx_nginx_site_name: "awx.k8sforfun.com"
+awx_nginx_sites_available_dir: "/etc/nginx/sites-available"
+awx_nginx_sites_enabled_dir: "/etc/nginx/sites-enabled"
+awx_nginx_config_path: "{{ awx_nginx_sites_available_dir }}/{{ awx_nginx_site_name }}"
+awx_nginx_enabled_path: "{{ awx_nginx_sites_enabled_dir }}/{{ awx_nginx_site_name }}"
+awx_nginx_websocket_map_path: "/etc/nginx/conf.d/awx-websocket-map.conf"
+awx_certbot_email: "hossein3piol@proton.me"
+
+awx_projects_persistence: false
+
+awx_web_replicas: 1
+awx_task_replicas: 1
+
+awx_web_requests_cpu: "250m"
+awx_web_requests_memory: "512Mi"
+awx_web_limits_cpu: "1"
+awx_web_limits_memory: "2Gi"
+
+awx_task_requests_cpu: "500m"
+awx_task_requests_memory: "1Gi"
+awx_task_limits_cpu: "2"
+awx_task_limits_memory: "3Gi"
+
+awx_redis_requests_cpu: "10m"
+awx_redis_requests_memory: "16Mi"
+awx_redis_limits_cpu: "100m"
+awx_redis_limits_memory: "128Mi"
+
+awx_rsyslog_requests_cpu: "10m"
+awx_rsyslog_requests_memory: "128Mi"
+awx_rsyslog_limits_cpu: "100m"
+awx_rsyslog_limits_memory: "256Mi"
+
+awx_ee_requests_cpu: "50m"
+awx_ee_requests_memory: "64Mi"
+awx_ee_limits_cpu: "1"
+awx_ee_limits_memory: "1Gi"
+
+awx_postgres_requests_cpu: "10m"
+awx_postgres_requests_memory: "64Mi"
+awx_postgres_limits_cpu: "500m"
+awx_postgres_limits_memory: "512Mi"
+
+kubectl_release_url: "https://dl.k8s.io/release"
+
+awx_preflight_enabled: true
+awx_minimum_vcpus: 4
+awx_minimum_memory_mb: 6000
+awx_minimum_disk_bytes: 32212254720
+awx_connectivity_checks:
+  - url: "https://api.github.com/repos/kubernetes-sigs/kind/releases/latest"
+    status_codes: [200]
+  - url: "https://dl.k8s.io/release/stable.txt"
+    status_codes: [200]
+  - url: "https://quay.io/v2/"
+    status_codes: [200, 401]
+  - url: "https://registry-1.docker.io/v2/"
+    status_codes: [200, 401]
+
+awx_deployment_timeout: 600
+awx_workload_create_retries: 60
+awx_workload_create_delay: 10
+awx_endpoint_retries: 30
+awx_endpoint_delay: 10

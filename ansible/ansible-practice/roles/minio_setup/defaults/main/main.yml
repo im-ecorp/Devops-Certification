@@ -2,7 +2,7 @@
 # Default variables for MinIO setup
 
 # Docker image tag for MinIO
-minio_image_tag: "RELEASE.2025-05-24T17-08-30Z"
+minio_image_tag: "RELEASE.2025-09-07T16-13-09Z"
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "always"

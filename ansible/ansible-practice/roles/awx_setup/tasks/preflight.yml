@@ -1,0 +1,55 @@
+---
+# Validate the target before installing binaries or creating a cluster. The
+# loopback NodePort availability is checked immediately before cluster creation.
+
+# The project's ansible.cfg sets gather_subset = min, which does NOT provide
+# ansible_processor_vcpus or ansible_memtotal_mb. Gather the hardware subset
+# here so the resource checks below work regardless of the global default.
+- name: Gather hardware facts for resource preflight
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+    filter:
+      - ansible_processor_vcpus
+      - ansible_memtotal_mb
+      - ansible_architecture
+
+- name: Validate supported CPU architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "Unsupported architecture: {{ ansible_architecture }}"
+    success_msg: "Supported architecture detected: {{ ansible_architecture }}"
+
+- name: Get available disk space on the root filesystem
+  ansible.builtin.command:
+    argv:
+      - df
+      - --output=avail
+      - --block-size=1
+      - /
+  register: awx_disk_space
+  changed_when: false
+
+- name: Validate AWX test-environment host resources
+  ansible.builtin.assert:
+    that:
+      - ansible_processor_vcpus | int >= awx_minimum_vcpus | int
+      - ansible_memtotal_mb | int >= awx_minimum_memory_mb | int
+      - awx_disk_space.stdout_lines[-1] | trim | int >= awx_minimum_disk_bytes | int
+    fail_msg: >-
+      AWX requires at least {{ awx_minimum_vcpus }} vCPU,
+      {{ awx_minimum_memory_mb }} MB RAM, and
+      {{ (awx_minimum_disk_bytes | int / 1073741824) | round(0) | int }} GiB free disk.
+    success_msg: "The target satisfies the AWX test-environment resource requirements"
+
+- name: Verify required download and registry endpoints are reachable
+  ansible.builtin.uri:
+    url: "{{ item.url }}"
+    method: GET
+    return_content: false
+    status_code: "{{ item.status_codes }}"
+    timeout: 20
+  loop: "{{ awx_connectivity_checks }}"
+  loop_control:
+    label: "{{ item.url }}"

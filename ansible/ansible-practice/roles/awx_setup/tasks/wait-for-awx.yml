@@ -1,0 +1,214 @@
+---
+# Step 7: Monitor the AWX Installation
+#
+# The Operator reconciles the AWX custom resource and then creates the
+# web and task Deployments plus the PostgreSQL StatefulSet. Those objects
+# do not exist immediately after the custom resource is applied, so we
+# first wait for the Operator to create them, then wait for each workload
+# to finish rolling out.
+
+- name: Wait for Operator to create AWX workloads
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - "{{ item }}"
+      - -n
+      - "{{ awx_namespace }}"
+  register: awx_workload_created
+  changed_when: false
+  failed_when: false
+  retries: "{{ awx_workload_create_retries }}"
+  delay: "{{ awx_workload_create_delay }}"
+  until: awx_workload_created.rc == 0
+  loop:
+    - deployment/{{ awx_cluster_name }}-web
+    - deployment/{{ awx_cluster_name }}-task
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for Operator to create the AWX PostgreSQL StatefulSet
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - statefulsets
+      - -n
+      - "{{ awx_namespace }}"
+      - -l
+      - "app.kubernetes.io/managed-by=awx-operator,app.kubernetes.io/part-of={{ awx_cluster_name }}"
+      - -o
+      - 'jsonpath={.items[0].metadata.name}'
+  register: awx_postgres_statefulset
+  changed_when: false
+  failed_when: false
+  retries: "{{ awx_workload_create_retries }}"
+  delay: "{{ awx_workload_create_delay }}"
+  until:
+    - awx_postgres_statefulset.rc == 0
+    - awx_postgres_statefulset.stdout | length > 0
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for AWX Deployments to roll out
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - rollout
+      - status
+      - "{{ item }}"
+      - -n
+      - "{{ awx_namespace }}"
+      - "--timeout={{ awx_deployment_timeout }}s"
+  register: awx_rollout
+  changed_when: false
+  loop:
+    - deployment/{{ awx_cluster_name }}-web
+    - deployment/{{ awx_cluster_name }}-task
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for the AWX PostgreSQL StatefulSet to roll out
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - rollout
+      - status
+      - "statefulset/{{ awx_postgres_statefulset.stdout }}"
+      - -n
+      - "{{ awx_namespace }}"
+      - "--timeout={{ awx_deployment_timeout }}s"
+  changed_when: false
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for AWX web pods to become Ready
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - wait
+      - --for=condition=Ready
+      - pod
+      - -l
+      - "app.kubernetes.io/name={{ awx_cluster_name }}-web"
+      - -n
+      - "{{ awx_namespace }}"
+      - "--timeout={{ awx_deployment_timeout }}s"
+  changed_when: false
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for AWX task pods to become Ready
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - wait
+      - --for=condition=Ready
+      - pod
+      - -l
+      - "app.kubernetes.io/name={{ awx_cluster_name }}-task"
+      - -n
+      - "{{ awx_namespace }}"
+      - "--timeout={{ awx_deployment_timeout }}s"
+  changed_when: false
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for AWX postgres pod to become Ready
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - wait
+      - --for=condition=Ready
+      - pod
+      - -l
+      - app.kubernetes.io/component=database
+      - -n
+      - "{{ awx_namespace }}"
+      - "--timeout={{ awx_deployment_timeout }}s"
+  changed_when: false
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Get all AWX pods
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - pods
+      - -n
+      - "{{ awx_namespace }}"
+  register: awx_pods
+  changed_when: false
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Display pod status
+  ansible.builtin.debug:
+    var: awx_pods.stdout_lines
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Wait for the AWX Service to have a ready endpoint
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - endpoints
+      - "{{ awx_cluster_name }}-service"
+      - -n
+      - "{{ awx_namespace }}"
+      - -o
+      - "jsonpath={.subsets[0].addresses[0].ip}"
+  register: awx_service_endpoint
+  changed_when: false
+  retries: "{{ awx_endpoint_retries }}"
+  delay: "{{ awx_endpoint_delay }}"
+  until: awx_service_endpoint.stdout | length > 0
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Verify the loopback AWX NodePort endpoint
+  ansible.builtin.uri:
+    url: >-
+      http://{{ awx_nodeport_listen_address }}:{{ awx_nodeport_port }}/api/v2/ping/
+    method: GET
+    headers:
+      Host: "{{ awx_hostname }}"
+    status_code: 200
+    return_content: false
+  register: awx_endpoint_result
+  retries: "{{ awx_endpoint_retries }}"
+  delay: "{{ awx_endpoint_delay }}"
+  until: awx_endpoint_result.status == 200
+  tags:
+    - wait_awx
+    - setup_awx

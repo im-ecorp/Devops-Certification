@@ -1,0 +1,104 @@
+---
+# Step 3: Install Kind
+
+- name: Validate system architecture for Kind
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "Unsupported architecture for Kind: {{ ansible_architecture }}"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Detect system architecture for Kind
+  ansible.builtin.set_fact:
+    kind_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Get latest Kind release version
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/kubernetes-sigs/kind/releases/latest"
+    return_content: true
+  register: kind_release_response
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Extract Kind version from release response
+  ansible.builtin.set_fact:
+    kind_version: "{{ kind_release_response.json.tag_name }}"
+    kind_asset_name: "kind-linux-{{ kind_arch }}"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Find the Kind release asset
+  ansible.builtin.set_fact:
+    kind_release_assets: >-
+      {{ kind_release_response.json.assets
+         | selectattr('name', 'equalto', kind_asset_name)
+         | list }}
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Validate the Kind release asset exists
+  ansible.builtin.assert:
+    that:
+      - kind_release_assets | length == 1
+    fail_msg: "The latest Kind release does not provide exactly one {{ kind_asset_name }} asset"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Select the Kind release asset
+  ansible.builtin.set_fact:
+    kind_release_asset: "{{ kind_release_assets | first }}"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Validate the Kind release asset checksum
+  ansible.builtin.assert:
+    that:
+      - kind_release_asset.digest | default('') is match('^sha256:[0-9a-fA-F]{64}$')
+    fail_msg: "The latest Kind {{ kind_asset_name }} asset has no verifiable SHA256 digest"
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Check if Kind is already installed at the latest version
+  ansible.builtin.command: kind version
+  register: kind_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Download and install Kind
+  when: >
+    kind_check.failed
+    or kind_version not in (kind_check.stdout | default(''))
+  block:
+    - name: Download Kind binary
+      ansible.builtin.get_url:
+        url: "{{ kind_release_asset.browser_download_url }}"
+        dest: /usr/local/bin/kind
+        mode: "0755"
+        owner: root
+        group: root
+        checksum: "{{ kind_release_asset.digest }}"
+      tags:
+        - install_kind
+        - setup_awx
+
+- name: Verify Kind installation
+  ansible.builtin.command: kind version
+  register: kind_verify
+  changed_when: false
+  tags:
+    - install_kind
+    - setup_awx

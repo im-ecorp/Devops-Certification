@@ -1,0 +1,81 @@
+---
+# AWX Setup orchestrator — runs all steps sequentially
+
+- name: Validate AWX configuration
+  ansible.builtin.assert:
+    that:
+      - awx_cluster_name is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+      - awx_namespace is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+      - awx_service_type | lower == 'nodeport'
+      - awx_nodeport_port | int >= 30000
+      - awx_nodeport_port | int <= 32767
+      - awx_admin_password_secret is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+      - not awx_nginx_enabled or awx_hostname | length > 0
+      - not awx_nginx_enabled or awx_certbot_email | length > 0
+      - awx_nginx_site_name is match('^[A-Za-z0-9._-]+$')
+    fail_msg: "AWX role variables are invalid; review the cluster, NodePort, hostname, and Nginx settings"
+    success_msg: "AWX configuration is valid"
+  tags:
+    - always
+
+- name: Run host preflight checks
+  ansible.builtin.import_tasks: preflight.yml
+  when: awx_preflight_enabled
+  tags:
+    - preflight_awx
+    - setup_awx
+
+- name: Verify Docker is installed and running
+  ansible.builtin.import_tasks: verify-docker.yml
+  tags:
+    - verify_docker
+    - setup_awx
+
+- name: Install kubectl
+  ansible.builtin.import_tasks: install-kubectl.yml
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Install Kind
+  ansible.builtin.import_tasks: install-kind.yml
+  tags:
+    - install_kind
+    - setup_awx
+
+- name: Create Kind cluster
+  ansible.builtin.import_tasks: create-cluster.yml
+  tags:
+    - create_cluster
+    - setup_awx
+
+- name: Install AWX Operator
+  ansible.builtin.import_tasks: install-operator.yml
+  tags:
+    - install_operator
+    - setup_awx
+
+- name: Create AWX instance
+  ansible.builtin.import_tasks: create-awx-instance.yml
+  tags:
+    - create_awx
+    - setup_awx
+
+- name: Wait for AWX deployment
+  ansible.builtin.import_tasks: wait-for-awx.yml
+  tags:
+    - wait_awx
+    - setup_awx
+
+- name: Configure Nginx and SSL for AWX
+  ansible.builtin.import_tasks: configure-nginx.yml
+  when: awx_nginx_enabled
+  tags:
+    - configure_nginx
+    - setup_awx
+
+- name: Show AWX access information
+  ansible.builtin.import_tasks: get-admin-password.yml
+  tags:
+    - get_password
+    - setup_awx

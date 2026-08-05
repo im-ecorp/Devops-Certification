@@ -1,0 +1,63 @@
+---
+# Step 6: Create the AWX Instance
+
+- name: Create custom admin password secret
+  when: awx_admin_password | length > 0
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - apply
+      - -f
+      - -
+    stdin: "{{ lookup('ansible.builtin.template', 'admin-password-secret.yaml.j2') }}"
+  register: admin_secret_apply
+  changed_when: >
+    'created' in admin_secret_apply.stdout
+    or 'configured' in admin_secret_apply.stdout
+  no_log: true
+  tags:
+    - create_awx
+    - setup_awx
+
+- name: Template awx.yaml
+  ansible.builtin.template:
+    src: awx.yaml.j2
+    dest: "{{ service_dir }}/awx.yaml"
+    mode: "0644"
+  tags:
+    - create_awx
+    - setup_awx
+
+- name: Apply AWX custom resource
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - apply
+      - -f
+      - "{{ service_dir }}/awx.yaml"
+  register: awx_apply
+  changed_when: '"configured" in awx_apply.stdout or "created" in awx_apply.stdout'
+  tags:
+    - create_awx
+    - setup_awx
+
+- name: Verify AWX resource exists
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - awx
+      - "{{ awx_cluster_name }}"
+      - -n
+      - "{{ awx_namespace }}"
+  register: awx_resource
+  changed_when: false
+  tags:
+    - create_awx
+    - setup_awx

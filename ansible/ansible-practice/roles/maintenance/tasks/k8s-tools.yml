@@ -1,0 +1,28 @@
+---
+- name: Get latest kubectl version
+  uri:
+    url: https://dl.k8s.io/release/stable.txt
+    return_content: true
+  register: kubectl_latest_version
+
+- name: Update kubectl to latest version
+  get_url:
+    url: "https://dl.k8s.io/release/{{ kubectl_latest_version.content | trim }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+    force: true
+  when: kubectl_latest_version.status == 200
+
+- name: Get latest kind version
+  uri:
+    url: https://api.github.com/repos/kubernetes-sigs/kind/releases/latest
+    return_content: true
+  register: kind_latest_release
+
+- name: Update kind to latest version
+  get_url:
+    url: "https://kind.sigs.k8s.io/dl/{{ kind_latest_release.json.tag_name }}/kind-linux-amd64"
+    dest: /usr/local/bin/kind
+    mode: '0755'
+    force: true
+  when: kind_latest_release.status == 200

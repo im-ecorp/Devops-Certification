@@ -1,0 +1,81 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy AWX on Kind behind host Nginx
+    options:
+      awx_operator_version:
+        type: str
+      service_dir:
+        type: path
+      awx_cluster_name:
+        type: str
+      awx_kubectl_context:
+        type: str
+      awx_namespace:
+        type: str
+      awx_service_type:
+        type: str
+        choices:
+          - nodeport
+      awx_nodeport_port:
+        type: int
+      awx_nodeport_listen_address:
+        type: str
+      awx_admin_user:
+        type: str
+      awx_admin_password:
+        type: str
+        no_log: true
+      awx_admin_password_secret:
+        type: str
+      awx_display_admin_password:
+        type: bool
+      awx_nginx_enabled:
+        type: bool
+      awx_hostname:
+        type: str
+      awx_nginx_site_name:
+        type: str
+      awx_nginx_sites_available_dir:
+        type: str
+      awx_nginx_sites_enabled_dir:
+        type: str
+      awx_nginx_config_path:
+        type: path
+      awx_nginx_enabled_path:
+        type: path
+      awx_nginx_websocket_map_path:
+        type: path
+      awx_certbot_email:
+        type: str
+      awx_projects_persistence:
+        type: bool
+      awx_preflight_enabled:
+        type: bool
+      awx_minimum_vcpus:
+        type: int
+      awx_minimum_memory_mb:
+        type: int
+      awx_minimum_disk_bytes:
+        type: int
+      awx_connectivity_checks:
+        type: list
+        elements: dict
+        options:
+          url:
+            type: str
+            required: true
+          status_codes:
+            type: list
+            elements: int
+            required: true
+      awx_deployment_timeout:
+        type: int
+      awx_workload_create_retries:
+        type: int
+      awx_workload_create_delay:
+        type: int
+      awx_endpoint_retries:
+        type: int
+      awx_endpoint_delay:
+        type: int

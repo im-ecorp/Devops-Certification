@@ -1,0 +1,80 @@
+---
+# Step 2: Install kubectl
+
+- name: Validate system architecture for kubectl
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "Unsupported architecture for kubectl: {{ ansible_architecture }}"
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Detect system architecture for kubectl
+  ansible.builtin.set_fact:
+    kubectl_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Get latest kubectl version
+  ansible.builtin.uri:
+    url: "{{ kubectl_release_url }}/stable.txt"
+    return_content: true
+  register: kubectl_version_response
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Set kubectl version fact
+  ansible.builtin.set_fact:
+    kubectl_version: "{{ kubectl_version_response.content | trim }}"
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Check if kubectl is already installed at the latest version
+  ansible.builtin.command: kubectl version --client --output=json
+  register: kubectl_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Get kubectl SHA256 checksum
+  ansible.builtin.uri:
+    url: "{{ kubectl_release_url }}/{{ kubectl_version }}/bin/linux/{{ kubectl_arch }}/kubectl.sha256"
+    return_content: true
+  register: kubectl_checksum_response
+  when: >
+    kubectl_check.failed
+    or kubectl_version not in (kubectl_check.stdout | default(''))
+  tags:
+    - install_kubectl
+    - setup_awx
+
+- name: Download and install kubectl
+  when: >
+    kubectl_check.failed
+    or kubectl_version not in (kubectl_check.stdout | default(''))
+  block:
+    - name: Download kubectl binary
+      ansible.builtin.get_url:
+        url: "{{ kubectl_release_url }}/{{ kubectl_version }}/bin/linux/{{ kubectl_arch }}/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+        owner: root
+        group: root
+        checksum: "sha256:{{ kubectl_checksum_response.content | trim }}"
+      tags:
+        - install_kubectl
+        - setup_awx
+
+- name: Verify kubectl installation
+  ansible.builtin.command: kubectl version --client
+  register: kubectl_verify
+  changed_when: false
+  tags:
+    - install_kubectl
+    - setup_awx

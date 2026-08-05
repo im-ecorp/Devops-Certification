@@ -1,0 +1,74 @@
+---
+# Step 5: Install the AWX Operator
+
+- name: Template kustomization.yaml
+  ansible.builtin.template:
+    src: kustomization.yaml.j2
+    dest: "{{ service_dir }}/kustomization.yaml"
+    mode: "0644"
+  tags:
+    - install_operator
+    - setup_awx
+
+- name: Apply AWX Operator via kustomize
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - apply
+      - -k
+      - "{{ service_dir }}"
+  register: operator_apply
+  changed_when: '"configured" in operator_apply.stdout or "created" in operator_apply.stdout'
+  tags:
+    - install_operator
+    - setup_awx
+
+- name: Wait for AWX Operator deployment to roll out
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - rollout
+      - status
+      - deployment/awx-operator-controller-manager
+      - -n
+      - "{{ awx_namespace }}"
+      - --timeout=300s
+  register: operator_rollout
+  changed_when: false
+  tags:
+    - install_operator
+    - setup_awx
+
+- name: Get running Operator pods
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --context
+      - "{{ awx_kubectl_context }}"
+      - get
+      - pods
+      - -n
+      - "{{ awx_namespace }}"
+      - -l
+      - control-plane=controller-manager
+      - --field-selector=status.phase=Running
+      - --no-headers
+  register: operator_pods
+  changed_when: false
+  tags:
+    - install_operator
+    - setup_awx
+
+- name: Assert Operator is running
+  ansible.builtin.assert:
+    that:
+      - operator_pods.stdout_lines | length > 0
+    success_msg: "AWX Operator is deployed and running"
+    fail_msg: "AWX Operator deployment failed"
+  tags:
+    - install_operator
+    - setup_awx
