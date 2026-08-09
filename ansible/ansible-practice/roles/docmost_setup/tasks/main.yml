@@ -1,0 +1,12 @@
+---
+
+- name: Setup Docmost Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_docmost
+    - setup_docmost
+
+- name: Setup Docmost Service | Workspace
+  ansible.builtin.import_tasks: auth-setup.yml
+  tags:
+    - setup_docmost

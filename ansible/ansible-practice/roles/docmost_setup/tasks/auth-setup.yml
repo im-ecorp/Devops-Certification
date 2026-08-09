@@ -1,0 +1,40 @@
+---
+
+- name: Setup Docmost workspace
+  block:
+    - name: Check if workspace already exists
+      ansible.builtin.uri:
+        url: "{{ docmost_main_url }}/api/auth/setup"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          workspaceName: "{{ docmost_workspace_name }}"
+          name: "{{ docmost_admin_name }}"
+          email: "{{ docmost_admin_email }}"
+          password: "{{ docmost_admin_password }}"
+        status_code: [200, 403]
+        timeout: 15
+      register: workspace_setup
+
+    - name: Display workspace setup result
+      ansible.builtin.debug:
+        msg: "Workspace '{{ docmost_workspace_name }}' created successfully."
+      when: workspace_setup.status == 200
+
+    - name: Display workspace already exists
+      ansible.builtin.debug:
+        msg: "Workspace already exists. Skipping setup."
+      when: workspace_setup.status == 403
+  rescue:
+    - name: Handle workspace setup failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to setup Docmost workspace.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: "Docmost workspace setup failed."
+  tags:
+    - setup_docmost

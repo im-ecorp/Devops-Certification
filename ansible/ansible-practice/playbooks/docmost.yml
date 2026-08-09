@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure Docmost service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - docmost_setup

@@ -1,0 +1,52 @@
+---
+# Default variables for Docmost setup
+
+# Docker image versions
+docmost_image_tag: "0.95.0"
+docmost_postgres_image_tag: "18.4"
+docmost_redis_image_tag: "8.10.0"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/docmost"
+
+# Domain name for Docmost (used by Traefik)
+docmost_main_domain: "docs.{{ main_domain }}"
+docmost_main_url: "https://{{ docmost_main_domain }}"
+
+
+# Workspace setup
+docmost_workspace_name: "E-corp"
+docmost_admin_name: "Hossein Sepiol"
+docmost_admin_email: "mhsaeidi81@gmail.com"
+
+
+
+# JWT token lifetime
+docmost_jwt_token_expires_in: "30d"
+
+# Storage driver (local | s3)
+docmost_storage_driver: "local"
+
+# Maximum upload size (e.g. 50mb, 100mb)
+docmost_file_upload_size_limit: "100mb"
+
+# Disable anonymous usage telemetry
+docmost_disable_telemetry: true
+
+# S3/MinIO storage settings
+docmost_s3_endpoint: "http://minio-api.{{ main_domain }}"
+docmost_s3_region: "us-east-1"
+docmost_s3_bucket: "docmost"
+
+# Mail (SMTP) settings
+docmost_mail_driver: "smtp"
+docmost_mail_from_address: "docmost@{{ main_domain }}"
+docmost_mail_from_name: "Docmost"
+docmost_smtp_host: "127.0.0.1"
+docmost_smtp_port: 587
+docmost_smtp_secure: false
+docmost_smtp_ignore_tls: false
+

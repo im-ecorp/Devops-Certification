@@ -1,0 +1,114 @@
+services:
+
+  docmost:
+    image: docmost/docmost:${image_tag}
+    container_name: docmost
+    hostname: docmost
+    restart: ${restart_policy}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_URL: ${APP_URL}
+      HOST: 0.0.0.0
+      APP_SECRET: ${APP_SECRET}
+      JWT_TOKEN_EXPIRES_IN: ${JWT_TOKEN_EXPIRES_IN}
+      STORAGE_DRIVER: ${STORAGE_DRIVER}
+      FILE_UPLOAD_SIZE_LIMIT: ${FILE_UPLOAD_SIZE_LIMIT}
+      DISABLE_TELEMETRY: ${DISABLE_TELEMETRY}
+{% if docmost_s3_username is defined and docmost_s3_username %}
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
+      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE}
+{% endif %}
+{% if docmost_smtp_username is defined and docmost_smtp_username %}
+      MAIL_DRIVER: ${MAIL_DRIVER}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_IGNORETLS: ${SMTP_IGNORETLS}
+{% endif %}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    volumes:
+      - docmost_data:/app/data/storage
+    networks:
+      - web_net
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-docmost.rule=Host(`${docmost_main_domain}`)"
+      - "traefik.http.routers.http-docmost.entrypoints=web"
+      - "traefik.http.routers.docmost.rule=Host(`${docmost_main_domain}`)"
+      - "traefik.http.routers.docmost.entrypoints=web-secure"
+      - "traefik.http.routers.docmost.tls=true"
+      - "traefik.http.routers.docmost.tls.certresolver=myproduction"
+      - "traefik.http.routers.docmost.service=docmost"
+      - "traefik.http.services.docmost.loadBalancer.server.port=3000"
+
+  db:
+    image: postgres:${postgres_image_tag}
+    container_name: docmost-db
+    hostname: docmost-db
+    restart: ${restart_policy}
+    environment:
+      POSTGRES_DB: docmost
+      POSTGRES_USER: docmost
+      POSTGRES_PASSWORD: ${docmost_db_password}
+    volumes:
+      - db_data:/var/lib/postgresql
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmost -d docmost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:${redis_image_tag}
+    container_name: docmost-redis
+    hostname: docmost-redis
+    restart: ${restart_policy}
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  docmost_data:
+    name: docmost_data
+  db_data:
+    name: docmost_db_data
+  redis_data:
+    name: docmost_redis_data
