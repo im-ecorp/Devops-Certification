@@ -1,0 +1,120 @@
+---
+
+- name: Apply Portainer Business Edition license key
+  become: true
+  block:
+    - name: Get running Portainer container info
+      community.docker.docker_container_info:
+        name: "{{ portainer_container_name | default('portainer') }}"
+      register: portainer_container
+
+    - name: Show licensing status
+      ansible.builtin.debug:
+        msg: >-
+          License key is set. Running image:
+          {{ portainer_container.container.Image | default('none (container not present)') }}.
+          {{
+            'Already Business Edition - license applied at container start via PORTAINER_LICENSE_KEY.'
+            if portainer_container.exists and 'portainer-ee' in portainer_container.container.Image
+            else 'Community Edition detected - running in-app upgrade.'
+          }}
+
+    - name: Authenticate to Portainer API
+      ansible.builtin.uri:
+        url: "{{ portainer_api_url }}/api/auth"
+        method: POST
+        validate_certs: "{{ portainer_validate_certs }}"
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          Username: "{{ portainer_admin_user }}"
+          Password: "{{ portainer_admin_password }}"
+        status_code: 200
+      register: portainer_auth
+      when:
+        - portainer_container.exists
+        - "'portainer-ce' in portainer_container.container.Image"
+
+    - name: Upgrade Portainer CE to Business Edition via API
+      ansible.builtin.uri:
+        url: "{{ portainer_api_url }}/api/system/upgrade"
+        method: POST
+        validate_certs: "{{ portainer_validate_certs }}"
+        headers:
+          Authorization: "Bearer {{ portainer_auth.json.jwt }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          license: "{{ portainer_license_key }}"
+        status_code: [200, 204]
+        timeout: 120
+      register: portainer_upgrade
+      ignore_errors: true
+      when:
+        - portainer_container.exists
+        - "'portainer-ce' in portainer_container.container.Image"
+
+    - name: Wait for Portainer container to switch to Business Edition
+      community.docker.docker_container_info:
+        name: "{{ portainer_container_name | default('portainer') }}"
+      register: portainer_container_ee
+      until:
+        - portainer_container_ee.exists
+        - "'portainer-ee' in portainer_container_ee.container.Image"
+      retries: "{{ portainer_upgrade_wait_retries | default(18) }}"
+      delay: "{{ portainer_upgrade_wait_delay | default(10) }}"
+      when:
+        - portainer_container.exists
+        - "'portainer-ce' in portainer_container.container.Image"
+
+    - name: Pause for in-app updater cleanup
+      ansible.builtin.pause:
+        seconds: "{{ portainer_upgrade_settle_seconds | default(15) }}"
+      when:
+        - portainer_container.exists
+        - "'portainer-ce' in portainer_container.container.Image"
+
+    - name: Template environment file with Business Edition image
+      ansible.builtin.template:
+        src: .env.j2
+        dest: "{{ service_dir }}/.env"
+        mode: "0600"
+      register: portainer_env
+
+    - name: Reconcile Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ service_dir }}"
+      when: portainer_env.changed or (portainer_upgrade.changed | default(false))
+
+    - name: Verify Business Edition image
+      community.docker.docker_container_info:
+        name: "{{ portainer_container_name | default('portainer') }}"
+      register: portainer_container_final
+      failed_when:
+        - not portainer_container_final.exists
+        - "'portainer-ee' not in portainer_container_final.container.Image"
+
+    - name: Show license configuration result
+      ansible.builtin.debug:
+        msg: >-
+          Portainer is running {{ portainer_container_final.container.Image }}.
+          License key delivered to Portainer. Confirm activation in the UI under
+          Settings -> License.
+
+  rescue:
+    - name: Handle license application failure
+      ansible.builtin.debug:
+        msg: >-
+          Failed to apply the Portainer Business Edition license key.
+          Error: {{ ansible_failed_result.msg | default('unknown error') }}
+
+    - name: Fail with explicit message
+      ansible.builtin.fail:
+        msg: >-
+          Applying the Portainer license key failed. Verify that the key in
+          'portainer_license_key' is valid, that Portainer is reachable at
+          {{ portainer_api_url }}, and that admin credentials are correct.
+
+  tags:
+    - config_portainer

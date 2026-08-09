@@ -1,0 +1,47 @@
+services:
+  portainer:
+    image: ${portainer_image_name}:${image_tag}
+    container_name: portainer
+    hostname: portainer
+    restart: ${restart_policy}
+    environment:
+      PORTAINER_LICENSE_KEY: '${portainer_license_key}'
+    command:
+      - "--admin-password=${portainer_admin_password}"
+      - "--log-level=INFO"
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - 'portainer_data:/data'
+    networks: 
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # - "traefik.http.routers.http-portainer.rule=Host(`${portainer_main_domain}`)"
+      # - "traefik.http.routers.http-portainer.entrypoints=web"
+      - "traefik.http.routers.portainer.rule=Host(`${portainer_main_domain}`)"
+      - "traefik.http.routers.portainer.entrypoints=web-secure"
+      # - "traefik.http.routers.portainer.tls=true"
+      - "traefik.http.routers.portainer.tls.certresolver=myproduction"
+      - "traefik.http.routers.portainer.service=portainer"
+      - "traefik.http.services.portainer.loadBalancer.server.port=9000"
+
+      # - "traefik.http.routers.http-edge.rule=Host(`${portainer_edge_domain}`)"
+      # - "traefik.http.routers.http-edge.entrypoints=web"
+      - "traefik.http.routers.edge.rule=Host(`${portainer_edge_domain}`)"
+      - "traefik.http.routers.edge.entrypoints=web-secure"
+      # - "traefik.http.routers.edge.tls=true"
+      - "traefik.http.routers.edge.tls.certresolver=myproduction"
+      - "traefik.http.routers.edge.service=edge"
+      - "traefik.http.services.edge.loadBalancer.server.port=8000"
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  portainer_data:
+    name: portainer_data

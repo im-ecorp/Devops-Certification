@@ -1,0 +1,18 @@
+---
+
+# Deploy Portainer (Docker management UI) via Docker Compose on the remote host.
+- name: Setup Portainer Service
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_portainer
+    - setup_portainer
+
+# Apply the Business Edition license and switch the deployment to portainer-ee
+# when a license key is provided (runs after installation so fresh installs
+# deploy Business Edition directly via the compose file).
+- name: Configure Portainer license (Business Edition)
+  ansible.builtin.import_tasks: license-config.yml
+  when: portainer_license_key | length > 0
+  tags:
+    - install_portainer
+    - config_portainer

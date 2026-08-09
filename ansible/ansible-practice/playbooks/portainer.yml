@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure Portainer service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - portainer_setup
