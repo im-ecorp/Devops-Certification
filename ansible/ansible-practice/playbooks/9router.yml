@@ -1,0 +1,8 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json
+- name: Install and configure 9router service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - 9router_setup
