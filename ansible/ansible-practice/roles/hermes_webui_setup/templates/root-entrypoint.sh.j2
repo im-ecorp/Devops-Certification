@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+
+# The upstream image's init phase remaps "hermeswebui" to WANTED_UID and then
+# recursively chowns /home/hermeswebui. Remapping it to UID 0 creates a second
+# root account and re-enters the root init branch after `su`. For an existing
+# root-owned Hermes installation, skip only that ownership-remap branch. The
+# remainder of the upstream entrypoint still validates paths, prepares its
+# venv, stages the read-only Agent source, and starts the server.
+upstream_entrypoint=/hermeswebui_init.bash
+patched_entrypoint=/tmp/hermeswebui_init-root-home.bash
+
+python3 - "${upstream_entrypoint}" "${patched_entrypoint}" <<'PY'
+import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1])
+destination = pathlib.Path(sys.argv[2])
+root_init_needle = 'if [ "A${whoami}" == "Aroot" ]; then'
+root_init_replacement = (
+    'if [ "A${whoami}" == "Aroot" ] '
+    '&& [ "${HERMES_WEBUI_ROOT_HOME_MODE:-0}" != "1" ]; then'
+)
+agent_install_needle = (
+    'uv pip install "$_stage_src[all]" --trusted-host pypi.org '
+    '--trusted-host files.pythonhosted.org \\'
+)
+agent_install_replacement = (
+    'uv pip install -e "$_stage_src[all]" --trusted-host pypi.org '
+    '--trusted-host files.pythonhosted.org \\'
+)
+text = source.read_text(encoding="utf-8")
+if text.count(root_init_needle) != 1:
+    raise SystemExit(
+        "Unsupported Hermes WebUI image: expected exactly one upstream "
+        "root-init marker; refusing to start"
+    )
+if text.count(agent_install_needle) != 1:
+    raise SystemExit(
+        "Unsupported Hermes WebUI image: expected exactly one upstream "
+        "Hermes Agent install command; refusing to start"
+    )
+text = text.replace(root_init_needle, root_init_replacement, 1)
+text = text.replace(agent_install_needle, agent_install_replacement, 1)
+destination.write_text(text, encoding="utf-8")
+destination.chmod(0o700)
+PY
+
+export HERMES_WEBUI_ROOT_HOME_MODE=1
+exec "${patched_entrypoint}"

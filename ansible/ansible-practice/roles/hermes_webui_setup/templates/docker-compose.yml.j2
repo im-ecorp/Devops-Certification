@@ -1,0 +1,67 @@
+services:
+
+  hermes-webui:
+    image: ghcr.io/nesquena/hermes-webui:${image_tag}
+    container_name: hermes-webui
+    hostname: hermes-webui
+    restart: ${restart_policy}
+    init: true
+{% if hermes_webui_root_owned_home | bool %}
+    entrypoint: ["/bin/bash", "/opt/hermes-webui/root-entrypoint.sh"]
+{% endif %}
+    environment:
+      WANTED_UID: ${wanted_uid}
+      WANTED_GID: ${wanted_gid}
+      HERMES_HOME: /home/hermeswebui/.hermes
+      HERMES_CONFIG_PATH: /home/hermeswebui/.hermes/config.yaml
+      HERMES_WEBUI_AGENT_DIR: /opt/hermes
+      HERMES_WEBUI_HOST: 0.0.0.0
+      HERMES_WEBUI_PORT: ${hermes_webui_port}
+      HERMES_WEBUI_STATE_DIR: /var/lib/hermes-webui
+      HERMES_WEBUI_DEFAULT_WORKSPACE: /workspace
+      HERMES_WEBUI_SKIP_ONBOARDING: ${hermes_webui_skip_onboarding}
+      HERMES_WEBUI_PASSWORD: ${hermes_webui_password}
+      HERMES_WEBUI_SECURE: ${hermes_webui_secure}
+      HERMES_WEBUI_ALLOWED_ORIGINS: ${hermes_webui_allowed_origins}
+      HERMES_WEBUI_TRUST_FORWARDED_HOST: ${hermes_webui_trust_forwarded_host}
+      HERMES_WEBUI_TRUST_FORWARDED_FOR: ${hermes_webui_trust_forwarded_for}
+      HERMES_WEBUI_TRUST_FORWARDED_PROTO: ${hermes_webui_trust_forwarded_proto}
+      HERMES_SKIP_CHMOD: ${hermes_webui_skip_chmod}
+{% if hermes_webui_root_owned_home | bool %}
+      HERMES_WEBUI_ROOT_HOME_MODE: 1
+{% endif %}
+    volumes:
+      - "{{ hermes_webui_home_dir }}:/home/hermeswebui/.hermes"
+      - "{{ hermes_webui_agent_export_dir }}:/opt/hermes:ro"
+      - "{{ hermes_webui_state_dir }}:/var/lib/hermes-webui"
+      - "{{ hermes_webui_workspace_dir }}:/workspace"
+{% if hermes_webui_root_owned_home | bool %}
+      - "{{ service_dir }}/root-entrypoint.sh:/opt/hermes-webui/root-entrypoint.sh:ro"
+{% endif %}
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    networks:
+      - web_net
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-hermes-webui.rule=Host(`${hermes_webui_domain}`)"
+      - "traefik.http.routers.http-hermes-webui.entrypoints=web"
+      - "traefik.http.routers.hermes-webui.rule=Host(`${hermes_webui_domain}`)"
+      - "traefik.http.routers.hermes-webui.entrypoints=web-secure"
+      - "traefik.http.routers.hermes-webui.tls=true"
+      - "traefik.http.routers.hermes-webui.tls.certresolver=myproduction"
+      - "traefik.http.routers.hermes-webui.service=hermes-webui"
+      - "traefik.http.services.hermes-webui.loadBalancer.server.port=${hermes_webui_port}"
+
+networks:
+  web_net:
+    name: web_net
+    external: true

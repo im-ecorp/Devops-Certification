@@ -1,0 +1,7 @@
+---
+
+- name: Setup Hermes WebUI Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_hermes_webui
+    - setup_hermes_webui

@@ -1,0 +1,192 @@
+---
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Check if the Hermes home directory already exists
+  ansible.builtin.stat:
+    path: "{{ hermes_webui_home_dir }}"
+  register: hermes_home_stat
+  tags:
+    - preparing
+
+- name: Require an existing Hermes CLI home
+  ansible.builtin.assert:
+    that:
+      - hermes_home_stat.stat.exists
+      - hermes_home_stat.stat.isdir
+    fail_msg: >-
+      {{ hermes_webui_home_dir }} must be the existing Hermes CLI home. This
+      role will not create or initialize it because doing so could hide a bad
+      path and start WebUI with an empty configuration.
+  tags:
+    - preparing
+
+- name: Check required Hermes CLI data and installed Agent source
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ hermes_webui_home_dir }}/config.yaml"
+    - "{{ hermes_webui_home_dir }}/state.db"
+    - "{{ hermes_webui_agent_dir }}/pyproject.toml"
+    - "{{ hermes_webui_agent_dir }}/run_agent.py"
+  register: hermes_required_paths
+  tags:
+    - preparing
+
+- name: Require the existing config, session database, and Agent source
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Required Hermes path is missing or is not a file: {{ item.item }}"
+  loop: "{{ hermes_required_paths.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  tags:
+    - preparing
+
+- name: Use the existing Hermes home owner inside the container
+  ansible.builtin.set_fact:
+    hermes_webui_uid: "{{ hermes_home_stat.stat.uid }}"
+    hermes_webui_gid: "{{ hermes_home_stat.stat.gid }}"
+    hermes_webui_root_owned_home: "{{ hermes_home_stat.stat.uid | int == 0 }}"
+  tags:
+    - preparing
+
+- name: Require explicit root-runtime support for a root-owned Hermes home
+  ansible.builtin.assert:
+    that:
+      - hermes_webui_allow_root_runtime | bool
+    fail_msg: >-
+      {{ hermes_webui_home_dir }} is owned by root. Set
+      hermes_webui_allow_root_runtime=true to use the guarded entrypoint that
+      preserves the existing ownership, or run Hermes under a non-root account.
+  when: hermes_webui_root_owned_home | bool
+  tags:
+    - preparing
+
+- name: Create WebUI-owned state directory
+  ansible.builtin.file:
+    path: "{{ hermes_webui_state_dir }}"
+    state: directory
+    owner: "{{ hermes_webui_uid }}"
+    group: "{{ hermes_webui_gid }}"
+    mode: "0700"
+  tags:
+    - preparing
+
+- name: Create filtered Agent source export directory
+  ansible.builtin.file:
+    path: "{{ hermes_webui_agent_export_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Export installed Agent source without host build artifacts
+  ansible.builtin.command:
+    argv:
+      - rsync
+      - --archive
+      - --delete
+      - --itemize-changes
+      - --exclude=.git/
+      - --exclude=venv/
+      - --exclude=node_modules/
+      - --exclude=__pycache__/
+      - --exclude=*.pyc
+      - --exclude=*.egg-info/
+      - --exclude=.playwright/
+      - "{{ hermes_webui_agent_dir }}/"
+      - "{{ hermes_webui_agent_export_dir }}/"
+  register: hermes_agent_export
+  changed_when: hermes_agent_export.stdout | length > 0
+  tags:
+    - preparing
+
+- name: Create Hermes workspace directory
+  ansible.builtin.file:
+    path: "{{ hermes_webui_workspace_dir }}"
+    state: directory
+    owner: "{{ hermes_webui_uid }}"
+    group: "{{ hermes_webui_gid }}"
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Install guarded entrypoint for a root-owned Hermes home
+  ansible.builtin.template:
+    src: root-entrypoint.sh.j2
+    dest: "{{ service_dir }}/root-entrypoint.sh"
+    mode: "0755"
+  when: hermes_webui_root_owned_home | bool
+  tags:
+    - preparing
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    recreate: >-
+      {{ 'always'
+         if (hermes_agent_export is defined and hermes_agent_export.changed)
+         else 'auto' }}
+  register: compose_deploy
+  tags:
+    - deploy
+
+- name: Wait for Hermes WebUI to be available
+  ansible.builtin.uri:
+    url: "{{ hermes_webui_url }}/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: hermes_webui_health
+  until: hermes_webui_health.status == 200
+  retries: 30
+  delay: 10
+  tags:
+    - deploy
