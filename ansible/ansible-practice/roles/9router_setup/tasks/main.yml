@@ -1,0 +1,7 @@
+---
+
+- name: Setup 9router Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_9router
+    - setup_9router

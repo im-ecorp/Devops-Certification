@@ -1,0 +1,21 @@
+---
+# Default variables for 9router setup
+
+# Docker image tags
+nine_router_image_tag: "latest"
+nine_router_headroom_image_tag: "latest"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/9router"
+
+# Domain name for 9router (used by Traefik)
+nine_router_main_domain: "9router.{{ main_domain }}"
+nine_router_main_url: "https://{{ nine_router_main_domain }}"
+
+# Domain name for Headroom (used by Traefik)
+headroom_main_domain: "headroom.{{ main_domain }}"
+
+

@@ -1,0 +1,73 @@
+services:
+  # 9router — main application service
+  9router:
+    image: decolua/9router:${image_tag}
+    container_name: 9router
+    hostname: 9router
+    restart: ${restart_policy}
+    volumes:
+      - 9router_data:/app/data
+    environment:
+      DATA_DIR: /app/data
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      JWT_SECRET: "${JWT_SECRET}"
+      BASE_URL: "${BASE_URL}"
+      CLOUD_URL: "${CLOUD_URL}"
+      NEXT_PUBLIC_BASE_URL: "${NEXT_PUBLIC_BASE_URL}"
+      NEXT_PUBLIC_CLOUD_URL: "${NEXT_PUBLIC_CLOUD_URL}"
+      HEADROOM_URL: http://headroom:8787
+
+    depends_on:
+      - headroom
+    networks:
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # HTTP-to-HTTPS redirect
+      - "traefik.http.routers.http-9router.rule=Host(`${nine_router_main_domain}`)"
+      - "traefik.http.routers.http-9router.entrypoints=web"
+      # HTTPS route
+      - "traefik.http.routers.9router.rule=Host(`${nine_router_main_domain}`)"
+      - "traefik.http.routers.9router.entrypoints=web-secure"
+      - "traefik.http.routers.9router.tls=true"
+      - "traefik.http.routers.9router.tls.certresolver=myproduction"
+      - "traefik.http.routers.9router.service=9router"
+      - "traefik.http.services.9router.loadBalancer.server.port=20128"
+
+  # Headroom — companion service with basic auth
+  headroom:
+    image: ghcr.io/chopratejas/headroom:${headroom_image_tag}
+    container_name: headroom
+    hostname: headroom
+    restart: ${restart_policy}
+    networks:
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # HTTPS route with basic auth middleware
+      - "traefik.http.middlewares.headroom-auth.basicauth.users=${headroom_auth_user}:${headroom_auth_pass}"
+      - "traefik.http.routers.http-headroom.rule=Host(`${headroom_main_domain}`)"
+      - "traefik.http.routers.http-headroom.entrypoints=web"
+      - "traefik.http.routers.headroom.rule=Host(`${headroom_main_domain}`)"
+      - "traefik.http.routers.headroom.middlewares=headroom-auth@docker"
+      - "traefik.http.routers.headroom.entrypoints=web-secure"
+      - "traefik.http.routers.headroom.tls=true"
+      - "traefik.http.routers.headroom.tls.certresolver=myproduction"
+      - "traefik.http.routers.headroom.service=headroom"
+      - "traefik.http.services.headroom.loadBalancer.server.port=8787"
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  9router_data:
+    name: 9router_data
+    external: false
