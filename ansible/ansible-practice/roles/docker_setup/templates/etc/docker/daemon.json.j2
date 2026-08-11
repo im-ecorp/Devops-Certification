@@ -1,4 +1,7 @@
+{# Build the Docker daemon.json configuration from docker_config variables #}
 {%- set daemon_config = {} -%}
+
+{# HTTP/HTTPS proxy settings for the Docker daemon #}
 {%- if docker_config.proxy.enabled | bool -%}
 {%- set _ = daemon_config.update({
   'proxies': {
@@ -8,6 +11,8 @@
   }
 }) -%}
 {%- endif -%}
+
+{# Container log rotation (json-file driver with size limits) #}
 {%- if docker_config.logging.enabled | bool -%}
 {%- set _ = daemon_config.update({
   'log-driver': 'json-file',
@@ -18,11 +23,15 @@
   }
 }) -%}
 {%- endif -%}
+
+{# Pull-through registry mirror #}
 {%- if docker_config.mirror_registry.enabled | bool -%}
 {%- set _ = daemon_config.update({
   'registry-mirrors': [docker_config.mirror_registry.urls]
 }) -%}
 {%- endif -%}
+
+{# Registries that do not require TLS verification #}
 {%- if docker_config.insecure_registry.enabled | bool -%}
 {%- set _ = daemon_config.update({
   'insecure-registries': [
@@ -30,9 +39,13 @@
   ]
 }) -%}
 {%- endif -%}
+
+{# Experimental Docker features #}
 {%- if docker_config.experimental.enabled | bool -%}
 {%- set _ = daemon_config.update({'experimental': true}) -%}
 {%- endif -%}
+
+{# Keep containers running across daemon restarts #}
 {%- if docker_config.live_restore.enabled | bool -%}
 {%- set _ = daemon_config.update({'live-restore': true}) -%}
 {%- endif %}

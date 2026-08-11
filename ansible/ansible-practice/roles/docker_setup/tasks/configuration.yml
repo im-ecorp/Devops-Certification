@@ -20,6 +20,7 @@
   notify: 
     - restart docker
 
+# Uncomment to add users to the docker group:
 # - name: add users {{ item }} to docker group
 #   become: true
 #   ansible.builtin.user:

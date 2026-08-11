@@ -1,14 +1,17 @@
 services:
 
+  # Docmost — documentation and wiki platform
   docmost:
     image: docmost/docmost:${image_tag}
     container_name: docmost
     hostname: docmost
     restart: ${restart_policy}
     depends_on:
-      db:
+  # PostgreSQL database
+  db:
         condition: service_healthy
-      redis:
+  # Redis cache and queue
+  redis:
         condition: service_healthy
     environment:
       APP_URL: ${APP_URL}

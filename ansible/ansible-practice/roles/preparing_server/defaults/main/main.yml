@@ -1,12 +1,12 @@
 ---
-# Default variables for Preparing server setup
+# Default variables for server preparation
 
+# Trusted IPs added to both fail2ban and iptables whitelists
 trusted_ips:
   - "89.167.72.70"
   - "77.221.141.93"
 
-
-# SSH jail settings
+# Fail2ban SSH jail settings
 linux_fail2ban_ssh_enabled: true
 linux_fail2ban_ssh_port: "{{ ansible_port | default(22) }}"
 linux_fail2ban_ssh_filter: "sshd"
@@ -16,10 +16,10 @@ linux_fail2ban_ssh_maxretry: 5
 linux_fail2ban_ssh_bantime: 3600
 linux_fail2ban_ssh_findtime: 600
 
-# Backend for log monitoring
+# Backend for log monitoring (systemd or auto)
 linux_fail2ban_backend: "systemd"
 
-
+# Common packages installed on all distributions
 preparing_server_common_packages:
   - curl
   - vim
@@ -35,13 +35,15 @@ preparing_server_common_packages:
   - chrony
   - telnet
 
+# Debian-specific packages
 preparing_server_debian_packages:
   - iptables-persistent
 
+# RedHat-specific packages
 preparing_server_redhat_packages:
   - iptables-services
 
-
+# iptables firewall rules
 iptables:
   ssh_port: "{{ ansible_port | default(22) }}"
   network_adapter_access:
@@ -55,9 +57,10 @@ iptables:
   trusted_Range:
     - 10.60.10.0/24
 
+# URL to fetch authorized SSH public keys
 authorized_keys_url: "https://github.com/im-ecorp.keys"
 
-# lynis variables
+# Lynis security audit tool
 lynis_version: '3.1.7'
 lynis_name: 'lynis-{{ lynis_version }}'
 lynis_tarball_url: 'https://github.com/CISOfy/lynis/archive/refs/tags/{{ lynis_version }}.tar.gz'

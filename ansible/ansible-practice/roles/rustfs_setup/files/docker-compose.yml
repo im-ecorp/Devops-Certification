@@ -1,5 +1,6 @@
 
 services:
+  # RustFS — S3-compatible object storage
   rustfs:
     image: rustfs/rustfs:${image_tag}
     container_name: rustfs

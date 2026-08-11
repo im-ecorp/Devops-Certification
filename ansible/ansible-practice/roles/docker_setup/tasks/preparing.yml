@@ -19,8 +19,7 @@
     mode: "0644"
   become: true
 
-#modern way to add docker repository
-
+# Alternative: deb822 format (modern APT repository style)
 # - name: Add Docker deb822 repository
 #   ansible.builtin.deb822_repository:
 #     name: docker

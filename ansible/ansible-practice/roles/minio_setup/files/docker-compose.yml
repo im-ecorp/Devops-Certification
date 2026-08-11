@@ -1,6 +1,6 @@
 
-
 services:
+  # MinIO — S3-compatible object storage
   minio:
     image: minio/minio:${image_tag}
     container_name: minio

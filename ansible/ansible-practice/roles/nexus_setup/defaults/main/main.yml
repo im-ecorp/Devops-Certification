@@ -1,4 +1,5 @@
 ---
+
 # Default variables for Nexus setup
 
 # Docker image version for Nexus
@@ -14,8 +15,7 @@ service_dir: "{{ project_dir }}/nexus"
 nexus_main_domain: "repo.{{ main_domain }}"
 nexus_main_url: "https://{{ nexus_main_domain }}"
 
-
-# List of repositories to delete
+# Repositories to delete on first setup
 delete_repos:
   - maven-snapshots
   - maven-public
@@ -51,19 +51,18 @@ anonymous_config:
   user_id: "anonymous"
   realm_name: "NexusAuthorizingRealm"
 
-# List of realms to enable
+# Realms to enable
 realms_config:
   - name: "Docker Bearer Token"
     id: "DockerToken"
 
-
-# List of blob stores to create
+# Blob stores to create
 create_blob_stores:
   - apt
   - docker
   - raw
 
-# List of cleanup policies to create
+# Cleanup policies to create
 create_cleanup_policies:
   - name: apt
     format: apt
@@ -82,7 +81,7 @@ create_cleanup_policies:
     criteria_last_blob_updated: 30
     criteria_last_downloaded: 90
 
-# List of APT proxy repositories to create
+# APT proxy repositories to create
 create_apt_repository:
   # Ubuntu
   - name: "ubuntu"
@@ -122,7 +121,7 @@ create_apt_repository:
     blob_store: "apt"
     cleanup_policy: "apt"
 
-# List of Docker proxy repositories to create
+# Docker proxy repositories to create
 create_docker_repository:
   - name: "hub"
     remote_url: "https://hub.hamdocker.ir"
@@ -184,7 +183,7 @@ create_docker_repository:
     v1_enabled: true
     repo_domain: "github.{{ main_domain }}"
 
-# List of Raw proxy repositories to create
+# Raw proxy repositories to create
 create_raw_repository:
   - name: "kube"
     remote_url: "https://files.m.daocloud.io"
@@ -192,7 +191,7 @@ create_raw_repository:
     cleanup_policy: "raw"
     content_disposition: "INLINE"
 
-# List of Pypi proxy repositories to create
+# PyPI proxy repositories to create
 create_pypi_repository:
   - name: "pypi"
     remote_url: "https://pypi.org/"

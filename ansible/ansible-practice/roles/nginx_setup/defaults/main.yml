@@ -1,2 +1,3 @@
 ---
-# defaults file for nginx
+# Default variables for Nginx setup
+# No user-configurable variables are required for this role.

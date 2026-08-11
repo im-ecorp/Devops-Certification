@@ -1,5 +1,6 @@
 services:
 
+  # Traefik — reverse proxy and automatic TLS
   traefik:
     image: traefik:${image_tag}
     container_name: traefik
@@ -17,7 +18,9 @@ services:
       - "--entryPoints.web-secure.http.tls=true"
       - "--entryPoints.web.http.redirections.entryPoint.to=web-secure"
       - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+      # ACME TLS challenge for automatic certificate provisioning
       - "--certificatesresolvers.myproduction.acme.tlschallenge=true"
+      # Uncomment one of the following to override the ACME server:
       # - "--certificatesresolvers.myproduction.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       # - "--certificatesresolvers.myproduction.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
       - "--certificatesresolvers.myproduction.acme.email=${acme_email}"

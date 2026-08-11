@@ -1,4 +1,5 @@
-# docker-ce apt repositories
+# Docker CE APT repository
+# Selects stable, nightly (edge), or test channel based on docker_repo.channel settings
 
 {% set repo = "stable" %}
 {% if docker_repo.channel.nightly_enabled %}

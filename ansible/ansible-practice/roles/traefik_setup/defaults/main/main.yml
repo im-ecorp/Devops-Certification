@@ -1,19 +1,17 @@
 ---
 # Default variables for Traefik setup
 
-#traefik image tag
+# Docker image tag
 traefik_image_tag: "v3.7.10"
 
-#traefik sub domain 
+# Traefik dashboard subdomain
 traefik_domain: "traefik.{{ main_domain }}"
 
-#traefik restart policy
+# Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "on-failure"
 
-#traefik email for acme challenge
+# Email address for Let's Encrypt ACME certificate notifications
 acme_email: hossein3piol@proton.me
 
-#traefik service directory
+# Service directory on the remote host
 service_dir: "{{ project_dir }}/traefik"
-
-

@@ -1,4 +1,5 @@
 services:
+  # Portainer — Docker container management UI
   portainer:
     image: ${portainer_image_name}:${image_tag}
     container_name: portainer
@@ -17,20 +18,15 @@ services:
       - app_net
     labels:
       - "traefik.enable=true"
-      # - "traefik.http.routers.http-portainer.rule=Host(`${portainer_main_domain}`)"
-      # - "traefik.http.routers.http-portainer.entrypoints=web"
+      # HTTPS route for Portainer UI
       - "traefik.http.routers.portainer.rule=Host(`${portainer_main_domain}`)"
       - "traefik.http.routers.portainer.entrypoints=web-secure"
-      # - "traefik.http.routers.portainer.tls=true"
       - "traefik.http.routers.portainer.tls.certresolver=myproduction"
       - "traefik.http.routers.portainer.service=portainer"
       - "traefik.http.services.portainer.loadBalancer.server.port=9000"
-
-      # - "traefik.http.routers.http-edge.rule=Host(`${portainer_edge_domain}`)"
-      # - "traefik.http.routers.http-edge.entrypoints=web"
+      # HTTPS route for Edge agent
       - "traefik.http.routers.edge.rule=Host(`${portainer_edge_domain}`)"
       - "traefik.http.routers.edge.entrypoints=web-secure"
-      # - "traefik.http.routers.edge.tls=true"
       - "traefik.http.routers.edge.tls.certresolver=myproduction"
       - "traefik.http.routers.edge.service=edge"
       - "traefik.http.services.edge.loadBalancer.server.port=8000"

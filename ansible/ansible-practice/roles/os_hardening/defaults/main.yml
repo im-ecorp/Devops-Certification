@@ -1,25 +1,26 @@
 ---
+# Authentication and password policy
 os_env_user_paths: [/usr/local/sbin, /usr/local/bin, /usr/sbin, /usr/bin, /sbin, /bin]
 os_env_extra_user_paths: []
 os_auth_pw_max_age: 60
 os_auth_pw_min_age: 7 # Discourage password cycling
 os_auth_pw_warn_age: 7
-os_auth_pw_remember: 5 # Specify how many used passwords are record
+os_auth_pw_remember: 5 # Number of previous passwords to remember
 os_auth_retries: 5
 os_auth_lockout_time: 600 # Seconds (600 = 10min)
 os_auth_timeout: 60
 os_auth_allow_homeless: false
 os_auth_pam_oddjob_mkhomedir: false
 os_auth_pam_passwdqc_enable: true
-os_auth_pam_passwdqc_options: min=disabled,disabled,16,12,8 # Used in Debian
-os_auth_pam_pwquality_options: try_first_pass retry=3 authtok_type= # Used in RHEL7 and RHEL8
+os_auth_pam_passwdqc_options: min=disabled,disabled,16,12,8 # Debian passwdqc options
+os_auth_pam_pwquality_options: try_first_pass retry=3 authtok_type= # RHEL pwquality options
 os_auth_root_ttys: [console, tty1, tty2, tty3, tty4, tty5, tty6]
 os_chfn_restrict: ""
 
 # Set to `false` to disable "chmod 700" of home folders for regular users
 os_chmod_rootuser_home_folder: true
 os_chmod_home_folders: true
-# Specify user accounts, whose home folders shouldn't be chmodded to 700 when "os_chmod_home_folders" is enabled.
+# User accounts whose home folders should not be chmodded to 700
 os_ignore_home_folder_users: []
 
 # May contain: change_user
@@ -97,25 +98,11 @@ sysctl_config:
   # Useful for debugging multi-threaded applications
   kernel.core_uses_pid: 1
 
-  # When an attacker is trying to exploit the local kernel, it is often
-  # helpful to be able to examine where in memory the kernel, modules,
-  # and data structures live. As such, kernel addresses should be treated
-  # as sensitive information.
-  #
-  # Many files and interfaces contain these addresses (e.g. /proc/kallsyms,
-  # /proc/modules, etc), and this setting can censor the addresses. A value
-  # of "0" allows all users to see the kernel addresses. A value of "1"
-  # limits visibility to the root user, and "2" blocks even the root user.
-  #
-  # Some off-the-shelf malware exploit kernel addresses exposed
-  # via /proc/kallsyms so by not making these addresses easily available
-  # we increase the cost of such attack some what; now such malware has
-  # to check which kernel Tails is running and then fetch the corresponding
-  # kernel address map from some external source. This is not hard,
-  # but certainly not all malware has such functionality. | Tails-2
+  # Restrict kernel address visibility via /proc/kallsyms.
+  # 0 = all users, 1 = root only, 2 = nobody. | Tails-2
   kernel.kptr_restrict: 2
 
-  # kexec is dangerous: it enables replacement of the running kernel. | Tails-3
+  # Disable kexec to prevent runtime kernel replacement. | Tails-3
   kernel.kexec_load_disabled: 1
 
   # This setting controls how the kernel behaves towards module changes at
@@ -123,54 +110,18 @@ sysctl_config:
   # Setting it to 0 is actually never supported. | sysctl-29
   # kernel.modules_disabled: 1
 
-  # Magic Sysrq should be disabled, but can also be set to a safe value if so
-  # desired for physical machines. It can allow a safe reboot if the system hangs
-  # and is a 'cleaner' alternative to hitting the reset button. | sysctl-30
-  # The following values are permitted:
-  # * **0**   - disable sysrq
-  # * **1**   - enable sysrq completely
-  # * **>1**  - bitmask of enabled sysrq functions:
-  # * **2**   - control of console logging level
-  # * **4**   - control of keyboard (SAK, unraw)
-  # * **8**   - debugging dumps of processes etc.
-  # * **16**  - sync command
-  # * **32**  - remount read-only
-  # * **64**  - signalling of processes (term, kill, oom-kill)
-  # * **128** - reboot/poweroff
-  # * **256** - nicing of all RT tasks
+  # Disable Magic Sysrq key. Set to a bitmask to allow specific functions.
+  # See https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html | sysctl-30
   kernel.sysrq: 0
 
   # Virtual memory regions protection | sysctl-32
   kernel.randomize_va_space: 2
 
-  # The PTRACE system is used for debugging.  With it, a single user process
-  # can attach to any other dumpable process owned by the same user.  In the
-  # case of malicious software, it is possible to use PTRACE to access
-  # credentials that exist in memory (reusing existing SSH connections,
-  # extracting GPG agent information, etc).
-  #
-  # A PTRACE scope of "0" is the more permissive mode.  A scope of "1" limits
-  # PTRACE only to direct child processes (e.g. "gdb name-of-program" and
-  # "strace -f name-of-program" work, but gdb's "attach" and "strace -fp $PID"
-  # do not).  The PTRACE scope is ignored when a user has CAP_SYS_PTRACE, so
-  # "sudo strace -fp $PID" will work as before.  For more details see:
-  # https://wiki.ubuntu.com/SecurityTeam/Roadmap/KernelHardening#ptrace
-  #
-  # For applications launching crash handlers that need PTRACE, exceptions can
-  # be registered by the debuggee by declaring in the segfault handler
-  # specifically which process will be using PTRACE on the debuggee:
-  #   prctl(PR_SET_PTRACER, debugger_pid, 0, 0, 0);
-  #
-  # In general, PTRACE is not needed for the average running Ubuntu system.
-  # To that end, the default is to set the PTRACE scope to "2".  This value
-  # may not be appropriate for developers or servers with only admin accounts.
-  # | sysctl-35
+  # Restrict ptrace to child processes only (scope 2).
+  # See https://wiki.ubuntu.com/SecurityTeam/Roadmap/KernelHardening#ptrace | sysctl-35
   kernel.yama.ptrace_scope: 2
 
-  # Disable traffic forwarding.
-  # Setting the flag to 0 ensures that a system with multiple interfaces (for example, a hard
-  # proxy), will never be able to forward packets, and therefore, never serve as a router.
-  # | sysctl-01 | sysctl-19
+  # Enable IP forwarding (required for Docker/Kubernetes networking). | sysctl-01 | sysctl-19
   net.ipv4.ip_forward: 1
   net.ipv6.conf.all.forwarding: 1
 
@@ -210,12 +161,7 @@ sysctl_config:
   # RFC 1337 fix F1 | sysctl-10
   net.ipv4.tcp_rfc1337: 1
 
-  # Attackers use SYN flood attacks to perform a denial of service attack on a system
-  # by sending many SYN packets without completing the three way handshake.
-  # This will quickly use up slots in the kernel's half-open connection queue and
-  # prevent legitimate connections from succeeding.
-  # SYN cookies allow the system to keep accepting valid connections, even if
-  # under a denial of service attack. CIS Distro Independent 3.2.8.
+  # SYN cookies protect against SYN flood denial-of-service attacks. | CIS 3.2.8
   net.ipv4.tcp_syncookies: 1
 
   # Send(router) or accept(host) RFC1620 shared media redirects | sysctl-12
@@ -245,14 +191,7 @@ sysctl_config:
   net.ipv4.conf.all.log_martians: 1
   net.ipv4.conf.default.log_martians: 1
 
-  # Accepting redirects can lead to malicious networking behavior, so disable
-  # it if not needed.
-  # Attackers could use bogus ICMP redirect messages to maliciously alter the system
-  # routing tables and get them to send packets to incorrect networks and allow
-  # your system packets to be captured.
-  # Setting net.ipv4.conf.all.secure_redirects to 0 protects the system from
-  # routing table updates by possibly compromised known gateways.
-  # | sysctl-13 | sysctl-14 | sysctl-15 | sysctl-20
+  # Disable ICMP redirects to prevent routing table manipulation. | sysctl-13 to sysctl-16
   net.ipv4.conf.default.accept_redirects: 0
   net.ipv4.conf.all.accept_redirects: 0
   net.ipv4.conf.all.secure_redirects: 0
@@ -287,19 +226,10 @@ sysctl_config:
   # Assign one global unicast IPv6 addresses to each interface | sysctl-28
   net.ipv6.conf.default.max_addresses: 1
 
-  # Protect the zero page of memory from userspace mmap to prevent kernel
-  # NULL-dereference attacks against potential future kernel security
-  # vulnerabilities.  (Added in kernel 2.6.23.)
-  #
-  # While this default is built into the Ubuntu kernel, there is no way to
-  # restore the kernel default if the value is changed during runtime; for
-  # example via package removal (e.g. wine, dosemu).  Therefore, this value
-  # is reset to the secure default each time the sysctl values are loaded.
+  # Protect the zero page from userspace mmap to prevent NULL-dereference attacks.
   vm.mmap_min_addr: 65536
 
-  # These settings are set to the maximum supported value in order to
-  # improve ASLR effectiveness for mmap, at the cost of increased
-  # address-space fragmentation. | Tail-1
+  # Increase ASLR mmap randomization for improved security. | Tails-1
   vm.mmap_rnd_bits: 32
   vm.mmap_rnd_compat_bits: 16
 
@@ -331,6 +261,8 @@ os_hardening_enabled: true
 
 # Set to false to disable installing and configuring auditd.
 os_auditd_enabled: true
+
+# Auditd configuration
 os_auditd_template: etc/audit/auditd.conf.j2
 os_auditd_flush: INCREMENTAL
 os_auditd_freq: 20
@@ -352,7 +284,7 @@ os_auditd_name_format: NONE
 
 # Set the SELinux state, which can be either disabled, permissive, or enforcing.
 os_selinux_state: enforcing
-# Set the SELinux polixy.
+# Set the SELinux policy.
 os_selinux_policy: targeted
 
 # Mount options for proc in /etc/fstab.
@@ -408,12 +340,12 @@ os_apt_enabled: true
 # Set to false to disable installing and configuring selinux.
 os_selinux_enabled: true
 
-# Define the number of SHA rounds.
-# With a lot of rounds brute forcing the password is more difficult. But note also that it more CPU resources will be needed to authenticate users.
-# The values must be inside the 1000-999999999 range.
+# SHA hashing rounds — higher values increase brute-force resistance but use more CPU.
+# Valid range: 1000-999999999.
 os_sha_crypt_min_rounds: "640000"
 os_sha_crypt_max_rounds: "640000"
 
+# Filesystem mount options for /etc/fstab hardening
 os_mnt_boot_dir_mode: "0700"
 os_mnt_boot_enabled: false
 os_mnt_boot_src: ""
@@ -494,8 +426,6 @@ os_mnt_var_tmp_filesystem: ""
 os_mnt_var_tmp_dump: ""
 os_mnt_var_tmp_passno: ""
 
-#
-# .netrc User whitelist
-# keep .netrc file for users in whitelist
+# .netrc file management — keep .netrc for whitelisted users
 os_netrc_enabled: true
 os_netrc_whitelist_user: []

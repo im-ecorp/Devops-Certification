@@ -16,13 +16,10 @@ service_dir: "{{ project_dir }}/docmost"
 docmost_main_domain: "docs.{{ main_domain }}"
 docmost_main_url: "https://{{ docmost_main_domain }}"
 
-
 # Workspace setup
-docmost_workspace_name: "E-corp"
-docmost_admin_name: "Hossein Sepiol"
-docmost_admin_email: "mhsaeidi81@gmail.com"
-
-
+docmost_workspace_name: "amatisdadeh"
+docmost_admin_name: "Amatis Admin"
+docmost_admin_email: "admin@amatisdadeh.com"
 
 # JWT token lifetime
 docmost_jwt_token_expires_in: "30d"

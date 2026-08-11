@@ -195,23 +195,26 @@ ssh_server_match_address: false # sshd
 # list of hashes (containing port and rules) to generate Match LocalPort blocks for
 ssh_server_match_local_port: false # sshd
 
+# Allow users to set environment variables via ~/.ssh/environment
 ssh_server_permit_environment_vars: "no"
 ssh_server_accept_env_vars: ""
 
-# maximum number of concurrent unauthenticated connections to the SSH daemon
+# Maximum number of concurrent unauthenticated connections to the SSH daemon
 ssh_max_startups: 10:30:60 # sshd
 
+# Privilege separation sandbox mode (ssh < 7.5)
 ssh_ps59: sandbox
 
-# directory where to store ssh_password policy
+# Directory for SELinux ssh_password policy files
 ssh_custom_selinux_dir: /etc/selinux/local-policies
 
+# Minimum Diffie-Hellman modulus size for moduli file
 sshd_moduli_minimum: 2048
 
-# disable ChallengeResponseAuthentication
+# Disable challenge-response authentication
 ssh_challengeresponseauthentication: false
 
-# a list of public keys that are never accepted by the ssh server
+# Public keys that are never accepted by the SSH server
 ssh_server_revoked_keys: []
 # Set to false to turn the role into a no-op. Useful when using
 # the Ansible role dependency mechanism.
