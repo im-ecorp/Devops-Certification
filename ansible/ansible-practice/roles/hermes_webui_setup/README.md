@@ -22,14 +22,13 @@ See `defaults/main/main.yml` for all configurable variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `hermes_webui_image_tag` | `0.52.106` | Pinned Hermes WebUI Docker image tag |
+| `hermes_webui_image_tag` | `latest` | Hermes WebUI Docker image tag |
 | `restart_policy` | `unless-stopped` | Container restart policy |
 | `service_dir` | `{{ project_dir }}/hermes-webui` | Service directory on the remote host |
 | `hermes_webui_home_dir` | `/root/.hermes` | Existing Hermes CLI home mounted as `~/.hermes` |
 | `hermes_webui_agent_dir` | `/usr/local/lib/hermes-agent` | Official installer source directory |
 | `hermes_webui_agent_export_dir` | `{{ service_dir }}/agent-source` | Filtered source export mounted read-only at `/opt/hermes` |
 | `hermes_webui_state_dir` | `{{ service_dir }}/state` | Separate writable WebUI sessions/settings directory |
-| `hermes_webui_workspace_dir` | `{{ project_dir }}/hermes-workspace` | Host directory mounted as `/workspace` |
 | `hermes_webui_allow_root_runtime` | `true` | Permit the guarded root-owned-home entrypoint |
 | `hermes_webui_domain` | `hermes.{{ main_domain }}` | Public domain served by Traefik |
 | `hermes_webui_url` | `https://{{ hermes_webui_domain }}` | Public base URL of the WebUI |
@@ -99,13 +98,6 @@ skips only that phase, validates the upstream marker before doing so, and then
 runs the rest of the official startup script. `HERMES_SKIP_CHMOD=1` prevents
 the WebUI permission fixer from changing `.env`, `auth.json`, and other CLI
 credential modes.
-
-Hermes Agent v0.20.0 rejects wheel and sdist builds. WebUI `0.52.106` predates
-that packaging guard and invokes `uv pip install` without editable mode. The
-same guarded entrypoint validates and changes that one upstream command to
-`uv pip install -e`, which is the installation mode explicitly supported by
-the Agent source. It refuses to start if either expected upstream command has
-changed, preventing a silent patch against an incompatible future image.
 
 The existing host gateway may remain running. The WebUI container does not
 start a second gateway daemon; it runs WebUI chat turns in-process and reads

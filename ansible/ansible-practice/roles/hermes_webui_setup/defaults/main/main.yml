@@ -1,10 +1,8 @@
 ---
 # Default variables for Hermes WebUI setup
 
-# Hermes WebUI release used with the locally installed Hermes Agent source.
-# Keep this pinned: WebUI imports Hermes Agent internals and version drift can
-# otherwise break session/config compatibility unexpectedly.
-hermes_webui_image_tag: "0.52.106"
+# Hermes WebUI Docker image tag.
+hermes_webui_image_tag: "latest"
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "unless-stopped"
@@ -20,7 +18,6 @@ hermes_webui_agent_export_dir: "{{ service_dir }}/agent-source"
 # WebUI-owned state is deliberately kept outside the existing Hermes CLI home.
 # The WebUI can still read CLI sessions from hermes_webui_home_dir/state.db.
 hermes_webui_state_dir: "{{ service_dir }}/state"
-hermes_webui_workspace_dir: "{{ project_dir }}/hermes-workspace"
 
 # The official WebUI entrypoint cannot remap its runtime account to UID 0
 # safely. When the existing Hermes home is root-owned, use the guarded wrapper

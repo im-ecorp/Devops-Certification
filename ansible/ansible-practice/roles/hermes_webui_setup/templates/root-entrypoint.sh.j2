@@ -21,27 +21,13 @@ root_init_replacement = (
     'if [ "A${whoami}" == "Aroot" ] '
     '&& [ "${HERMES_WEBUI_ROOT_HOME_MODE:-0}" != "1" ]; then'
 )
-agent_install_needle = (
-    'uv pip install "$_stage_src[all]" --trusted-host pypi.org '
-    '--trusted-host files.pythonhosted.org \\'
-)
-agent_install_replacement = (
-    'uv pip install -e "$_stage_src[all]" --trusted-host pypi.org '
-    '--trusted-host files.pythonhosted.org \\'
-)
 text = source.read_text(encoding="utf-8")
 if text.count(root_init_needle) != 1:
     raise SystemExit(
         "Unsupported Hermes WebUI image: expected exactly one upstream "
         "root-init marker; refusing to start"
     )
-if text.count(agent_install_needle) != 1:
-    raise SystemExit(
-        "Unsupported Hermes WebUI image: expected exactly one upstream "
-        "Hermes Agent install command; refusing to start"
-    )
 text = text.replace(root_init_needle, root_init_replacement, 1)
-text = text.replace(agent_install_needle, agent_install_replacement, 1)
 destination.write_text(text, encoding="utf-8")
 destination.chmod(0o700)
 PY

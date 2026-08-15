@@ -18,7 +18,6 @@ services:
       HERMES_WEBUI_HOST: 0.0.0.0
       HERMES_WEBUI_PORT: ${hermes_webui_port}
       HERMES_WEBUI_STATE_DIR: /var/lib/hermes-webui
-      HERMES_WEBUI_DEFAULT_WORKSPACE: /workspace
       HERMES_WEBUI_SKIP_ONBOARDING: ${hermes_webui_skip_onboarding}
       HERMES_WEBUI_PASSWORD: ${hermes_webui_password}
       HERMES_WEBUI_SECURE: ${hermes_webui_secure}
@@ -34,7 +33,6 @@ services:
       - "{{ hermes_webui_home_dir }}:/home/hermeswebui/.hermes"
       - "{{ hermes_webui_agent_export_dir }}:/opt/hermes:ro"
       - "{{ hermes_webui_state_dir }}:/var/lib/hermes-webui"
-      - "{{ hermes_webui_workspace_dir }}:/workspace"
 {% if hermes_webui_root_owned_home | bool %}
       - "{{ service_dir }}/root-entrypoint.sh:/opt/hermes-webui/root-entrypoint.sh:ro"
 {% endif %}

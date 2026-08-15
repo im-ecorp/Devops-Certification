@@ -125,16 +125,6 @@
   tags:
     - preparing
 
-- name: Create Hermes workspace directory
-  ansible.builtin.file:
-    path: "{{ hermes_webui_workspace_dir }}"
-    state: directory
-    owner: "{{ hermes_webui_uid }}"
-    group: "{{ hermes_webui_gid }}"
-    mode: "0755"
-  tags:
-    - preparing
-
 - name: Install guarded entrypoint for a root-owned Hermes home
   ansible.builtin.template:
     src: root-entrypoint.sh.j2
