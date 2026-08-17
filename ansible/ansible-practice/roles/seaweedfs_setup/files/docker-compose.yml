@@ -1,0 +1,106 @@
+services:
+  # SeaweedFS Master, Volume, Filer, WebDAV, and S3 Server
+  seaweedfs:
+    image: chrislusf/seaweedfs:${image_tag}
+    container_name: seaweedfs
+    hostname: seaweedfs
+    restart: ${restart_policy}
+    command: 'server -dir=/data -ip.bind=0.0.0.0 -s3 -filer -webdav -volume.port=9340'
+    volumes:
+      - seaweedfs_data:/data
+    networks:
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # S3 Endpoint (Port 8333)
+      - "traefik.http.routers.http-seaweedfs-s3.rule=Host(`${seaweedfs_s3_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-s3.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-s3.rule=Host(`${seaweedfs_s3_domain}`)"
+      - "traefik.http.routers.seaweedfs-s3.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-s3.tls=true"
+      - "traefik.http.routers.seaweedfs-s3.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-s3.service=seaweedfs-s3"
+      - "traefik.http.services.seaweedfs-s3.loadBalancer.server.port=8333"
+
+      # Master UI / API (Port 9333)
+      - "traefik.http.routers.http-seaweedfs-master.rule=Host(`${seaweedfs_master_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-master.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-master.rule=Host(`${seaweedfs_master_domain}`)"
+      - "traefik.http.routers.seaweedfs-master.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-master.tls=true"
+      - "traefik.http.routers.seaweedfs-master.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-master.service=seaweedfs-master"
+      - "traefik.http.services.seaweedfs-master.loadBalancer.server.port=9333"
+
+      # Volume Server (Port 9340)
+      - "traefik.http.routers.http-seaweedfs-volume.rule=Host(`${seaweedfs_volume_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-volume.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-volume.rule=Host(`${seaweedfs_volume_domain}`)"
+      - "traefik.http.routers.seaweedfs-volume.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-volume.tls=true"
+      - "traefik.http.routers.seaweedfs-volume.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-volume.service=seaweedfs-volume"
+      - "traefik.http.services.seaweedfs-volume.loadBalancer.server.port=9340"
+
+      # Filer UI / API (Port 8888)
+      - "traefik.http.routers.http-seaweedfs-filer.rule=Host(`${seaweedfs_filer_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-filer.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-filer.rule=Host(`${seaweedfs_filer_domain}`)"
+      - "traefik.http.routers.seaweedfs-filer.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-filer.tls=true"
+      - "traefik.http.routers.seaweedfs-filer.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-filer.service=seaweedfs-filer"
+      - "traefik.http.services.seaweedfs-filer.loadBalancer.server.port=8888"
+
+      # WebDAV (Port 7333)
+      - "traefik.http.routers.http-seaweedfs-webdav.rule=Host(`${seaweedfs_webdav_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-webdav.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-webdav.rule=Host(`${seaweedfs_webdav_domain}`)"
+      - "traefik.http.routers.seaweedfs-webdav.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-webdav.tls=true"
+      - "traefik.http.routers.seaweedfs-webdav.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-webdav.service=seaweedfs-webdav"
+      - "traefik.http.services.seaweedfs-webdav.loadBalancer.server.port=7333"
+
+  # SeaweedFS Admin UI
+  seaweedfs-admin:
+    image: chrislusf/seaweedfs:${image_tag}
+    container_name: seaweedfs_admin
+    hostname: seaweedfs_admin
+    restart: ${restart_policy}
+    command: 'admin -master=seaweedfs:9333 -port=23646 -dataDir=/data -adminUser=${seaweedfs_admin_user} -adminPassword=${seaweedfs_admin_password}'
+    volumes:
+      - seaweedfs_admin_data:/data
+    networks:
+      - web_net
+      - app_net
+    depends_on:
+      - seaweedfs
+    labels:
+      - "traefik.enable=true"
+      # Admin UI (Port 23646)
+      - "traefik.http.routers.http-seaweedfs-admin.rule=Host(`${seaweedfs_admin_domain}`)"
+      - "traefik.http.routers.http-seaweedfs-admin.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-admin.rule=Host(`${seaweedfs_admin_domain}`)"
+      - "traefik.http.routers.seaweedfs-admin.entrypoints=web-secure"
+      - "traefik.http.routers.seaweedfs-admin.tls=true"
+      - "traefik.http.routers.seaweedfs-admin.tls.certresolver=myproduction"
+      - "traefik.http.routers.seaweedfs-admin.service=seaweedfs-admin"
+      - "traefik.http.services.seaweedfs-admin.loadBalancer.server.port=23646"
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  seaweedfs_data:
+    name: seaweedfs_data
+    external: false
+  seaweedfs_admin_data:
+    name: seaweedfs_admin_data
+    external: false

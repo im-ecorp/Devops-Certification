@@ -1,0 +1,7 @@
+---
+
+- name: Setup SeaweedFS Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_seaweedfs
+    - setup_seaweedfs

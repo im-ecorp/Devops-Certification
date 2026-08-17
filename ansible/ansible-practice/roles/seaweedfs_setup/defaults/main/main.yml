@@ -1,0 +1,20 @@
+---
+# Default variables for SeaweedFS setup
+
+# Docker image tag for SeaweedFS
+seaweedfs_image_tag: "4.41"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/seaweedfs"
+
+# SeaweedFS domains (used by reverse proxy)
+seaweedfs_s3_domain: "s3-api.{{ main_domain }}"
+seaweedfs_admin_domain: "s3-admin.{{ main_domain }}"
+# The following internal endpoints are disabled in Traefik by default but kept here for future reference
+seaweedfs_master_domain: "s3-master.{{ main_domain }}"
+seaweedfs_volume_domain: "s3-volume.{{ main_domain }}"
+seaweedfs_filer_domain: "s3-filer.{{ main_domain }}"
+seaweedfs_webdav_domain: "s3-webdav.{{ main_domain }}"
