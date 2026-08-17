@@ -2,7 +2,7 @@
 # Default variables for RustFS setup
 
 # Docker image version for RustFS
-rustfs_image_tag: "1.0.0-beta.12"
+rustfs_image_tag: "latest"
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "unless-stopped"
