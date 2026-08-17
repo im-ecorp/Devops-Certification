@@ -13,6 +13,8 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=web_net"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.web-secure.address=:443"
       - "--entryPoints.web-secure.http.tls=true"
@@ -31,6 +33,7 @@ services:
     volumes:
       - "traefik_data:/certs"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "${service_dir}/dynamic:/etc/traefik/dynamic:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.web-auth.basicauth.users=${web_auth_user}:${web_auth_pass}"

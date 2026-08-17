@@ -19,6 +19,14 @@
   tags:
     - preparing
 
+- name: Create dynamic configuration directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}/dynamic"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+
 - name: Copy file with owner and permissions
   ansible.builtin.copy:
     src: docker-compose.yml
