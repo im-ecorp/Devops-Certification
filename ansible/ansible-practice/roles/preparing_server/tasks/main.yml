@@ -8,7 +8,7 @@
     file: packages.yml
   tags:
     - install_packages
-    - check_reboot
+    - reboot_check
     
 - name: Configure iptables
   ansible.builtin.include_tasks:
@@ -34,3 +34,10 @@
     file: hardening.yml
   tags:
     - hardening
+
+- name: Configure shell (colors, prompt, aliases) for all users
+  ansible.builtin.include_tasks:
+    file: shell.yml
+  tags:
+    - shell
+    - shell_customization

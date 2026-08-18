@@ -1,0 +1,85 @@
+# -------------------------------------------------------------------
+# 99-client-shell.sh - unified shell customizations (colors, aliases)
+# Installed by Ansible role: preparing_server
+# Applied to all users via /etc/profile.d + user .bashrc + /etc/skel
+# -------------------------------------------------------------------
+
+# Only configure interactive shells
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+# --- History -------------------------------------------------------
+HISTCONTROL=ignoreboth
+shopt -s histappend
+HISTSIZE=10000
+HISTFILESIZE=20000
+shopt -s checkwinsize
+
+# --- Color support for ls / grep -----------------------------------
+if [ -x /usr/bin/dircolors ]; then
+    if [ -r ~/.dircolors ]; then
+        eval "$(dircolors -b ~/.dircolors)"
+    else
+        eval "$(dircolors -b)"
+    fi
+    alias ls='ls --color=auto'
+    alias dir='dir --color=auto'
+fi
+
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+
+# --- Handy aliases -------------------------------------------------
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias lt='ls -ltr'
+alias lh='ls -lh'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias home='cd ~'
+alias root='cd /'
+alias cls='clear'
+alias h='history'
+alias ports='ss -tulpn'
+alias mem='free -h'
+alias dfh='df -h'
+alias duh='du -sh *'
+alias reload='source ~/.bashrc'
+alias up='sudo apt update && sudo apt upgrade -y'
+
+# --- Colored prompt (forced) ---------------------------------------
+case "$TERM" in
+    xterm-color|*-256color|foot*|xterm*|screen*)
+        color_prompt=yes
+        ;;
+esac
+
+# uncomment/force color for the prompt
+force_color_prompt=yes
+if [ -n "$force_color_prompt" ]; then
+    if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
+        color_prompt=yes
+    else
+        color_prompt=
+    fi
+fi
+
+if [ "$color_prompt" = yes ]; then
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+else
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+fi
+unset color_prompt force_color_prompt
+
+# Set window title on xterm / rxvt
+case "$TERM" in
+xterm*|rxvt*|screen*)
+    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+    ;;
+*)
+    ;;
+esac

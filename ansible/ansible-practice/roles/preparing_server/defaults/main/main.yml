@@ -35,7 +35,8 @@ preparing_server_common_packages:
   - sudo
   - chrony
   - telnet
-
+  - rsync
+  
 # Debian-specific packages
 preparing_server_debian_packages:
   - iptables-persistent

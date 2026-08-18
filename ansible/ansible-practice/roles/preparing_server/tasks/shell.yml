@@ -1,0 +1,55 @@
+---
+- name: Deploy global shell customizations
+  ansible.builtin.template:
+    src: etc/profile.d/99-client-shell.sh.j2
+    dest: /etc/profile.d/99-client-shell.sh
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - shell
+    - shell_customization
+
+- name: Ensure /etc/skel/.bashrc exists (for future users)
+  ansible.builtin.file:
+    path: /etc/skel/.bashrc
+    state: touch
+    mode: "0644"
+  tags:
+    - shell
+    - shell_customization
+
+- name: Source customizations in /etc/skel/.bashrc (future users)
+  ansible.builtin.lineinfile:
+    path: /etc/skel/.bashrc
+    line: "[ -f /etc/profile.d/99-client-shell.sh ] && . /etc/profile.d/99-client-shell.sh"
+    marker: "# {mark} ANSIBLE CLIENT SHELL"
+  tags:
+    - shell
+    - shell_customization
+
+- name: Find existing user home directories
+  ansible.builtin.find:
+    paths:
+      - /root
+      - /home
+    hidden: true
+    file_type: directory
+    recurse: false
+  register: home_dirs
+  tags:
+    - shell
+    - shell_customization
+
+- name: Source customizations in .bashrc of each existing user
+  ansible.builtin.lineinfile:
+    path: "{{ item.path }}/.bashrc"
+    create: true
+    owner: "{{ item.path.split('/')[-1] }}"
+    mode: "0644"
+    line: "[ -f /etc/profile.d/99-client-shell.sh ] && . /etc/profile.d/99-client-shell.sh"
+    marker: "# {mark} ANSIBLE CLIENT SHELL"
+  loop: "{{ home_dirs.files }}"
+  tags:
+    - shell
+    - shell_customization
