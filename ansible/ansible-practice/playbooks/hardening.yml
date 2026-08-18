@@ -1,12 +1,3 @@
-# ---
-# - name: Hardening
-#   hosts: all
-#   become: true
-#   gather_facts: true
-#   roles:
-#     - ssh_hardening
-#     - os_hardening
-
 ---
 - name: Hardening
   hosts: all
