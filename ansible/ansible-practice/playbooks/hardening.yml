@@ -1,8 +1,45 @@
+# ---
+# - name: Hardening
+#   hosts: all
+#   become: true
+#   gather_facts: true
+#   roles:
+#     - ssh_hardening
+#     - os_hardening
+
 ---
 - name: Hardening
   hosts: all
   become: true
   gather_facts: true
-  roles:
-    - ssh_hardening
-    - os_hardening
+
+  vars:
+    hardened_ssh_port: 3031
+
+  tasks:
+    - name: Apply SSH hardening
+      ansible.builtin.include_role:
+        name: ssh_hardening
+      vars:
+        ssh_server_ports:
+          - "{{ hardened_ssh_port }}"
+
+    - name: Apply pending SSH handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Switch Ansible to the hardened SSH port
+      ansible.builtin.set_fact:
+        ansible_port: "{{ hardened_ssh_port }}"
+
+    - name: Reset the old SSH connection
+      ansible.builtin.meta: reset_connection
+
+    - name: Wait for SSH on the hardened port
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 5
+        sleep: 2
+        timeout: 60
+
+    - name: Apply OS hardening
+      ansible.builtin.include_role:
+        name: os_hardening
