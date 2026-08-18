@@ -5,6 +5,7 @@
 trusted_ips:
   - "89.167.72.70"
   - "77.221.141.93"
+  - "{{ ansible_host }}"
 
 # Fail2ban SSH jail settings
 linux_fail2ban_ssh_enabled: true

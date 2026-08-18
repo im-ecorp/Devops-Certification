@@ -1,0 +1,26 @@
+---
+- name: Check if sudo is installed
+  ansible.builtin.shell: command -v sudo
+  become: false
+  changed_when: false
+  failed_when: false
+  register: sudo_check
+
+- name: Install sudo if missing (Debian family)
+  ansible.builtin.apt:
+    name: sudo
+    state: present
+    update_cache: true
+  become: false
+  when:
+    - sudo_check.rc != 0
+    - ansible_facts["os_family"] == "Debian"
+
+- name: Install sudo if missing (RedHat family)
+  ansible.builtin.dnf:
+    name: sudo
+    state: present
+  become: false
+  when:
+    - sudo_check.rc != 0
+    - ansible_facts["os_family"] == "RedHat"

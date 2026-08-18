@@ -1,4 +1,8 @@
 ---
+- name: Bootstrap sudo if missing
+  ansible.builtin.include_tasks:
+    file: sudo.yml
+
 - name: Update and Install packages
   ansible.builtin.include_tasks:
     file: packages.yml
