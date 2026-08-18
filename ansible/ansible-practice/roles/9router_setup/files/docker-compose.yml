@@ -8,6 +8,7 @@ services:
     volumes:
       - 9router_data:/app/data
     environment:
+      INITIAL_PASSWORD: "${INITIAL_PASSWORD}"
       DATA_DIR: /app/data
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
