@@ -68,7 +68,7 @@ docker_config:
     urls: "https://hub.hamdocker.ir"
   # Registries that do not require TLS verification
   insecure_registry:
-    enabled: true
+    enabled: false
     urls: "https://test.k8sforfun.com"
   # Keep containers running across Docker daemon restarts
   live_restore:
