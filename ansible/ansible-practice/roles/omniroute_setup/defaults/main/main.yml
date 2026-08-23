@@ -1,0 +1,19 @@
+---
+# Default variables for OmniRoute setup
+
+# Docker image tags
+omniroute_image_tag: "latest"
+omniroute_redis_image_tag: "8.10.1-alpine"
+nginx_image_tag: "1.27-alpine"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "unless-stopped"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/omniroute"
+
+# Domain name for OmniRoute (used by Traefik)
+omniroute_main_domain: "omniroute.{{ main_domain }}"
+
+# OmniRoute Cloud Sync Endpoint (Option A)
+omniroute_cloud_url: "https://cloud.omniroute.online"

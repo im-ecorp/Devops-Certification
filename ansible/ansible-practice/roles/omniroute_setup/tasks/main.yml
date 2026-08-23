@@ -1,0 +1,6 @@
+---
+- name: Setup OmniRoute Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_omniroute
+    - setup_omniroute

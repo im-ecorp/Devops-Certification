@@ -1,0 +1,103 @@
+services:
+  redis:
+    image: redis:${redis_image_tag}
+    container_name: omniroute_redis
+    hostname: omniroute_redis
+    restart: ${restart_policy}
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - app_net
+
+  omniroute:
+    image: diegosouzapw/omniroute:${image_tag}
+    container_name: omniroute
+    hostname: omniroute
+    restart: ${restart_policy}
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PORT=20128
+      - DASHBOARD_PORT=20128
+      - API_PORT=20129
+      - LIVE_WS_PORT=20132
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - BASE_URL=${omniroute_base_url}
+      - NEXT_PUBLIC_BASE_URL=${omniroute_base_url}
+      - CLOUD_URL=${omniroute_cloud_url}
+      - NEXT_PUBLIC_CLOUD_URL=${omniroute_cloud_url}
+      - AUTH_COOKIE_SECURE=true
+      - REQUIRE_API_KEY=false
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:20128/api/settings/require-login', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - omniroute_data:/app/data
+    networks:
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # HTTP-to-HTTPS redirect
+      - "traefik.http.routers.http-omniroute.rule=Host(`${omniroute_main_domain}`)"
+      - "traefik.http.routers.http-omniroute.entrypoints=web"
+      # HTTPS route
+      - "traefik.http.routers.omniroute.rule=Host(`${omniroute_main_domain}`)"
+      - "traefik.http.routers.omniroute.entrypoints=web-secure"
+      - "traefik.http.routers.omniroute.tls=true"
+      - "traefik.http.routers.omniroute.tls.certresolver=myproduction"
+      - "traefik.http.routers.omniroute.service=omniroute"
+      - "traefik.http.services.omniroute.loadBalancer.server.port=20128"
+
+  # nginx sidecar: forwards ONLY the LOCAL_ONLY /api/db-backups/exportAll path
+  # to the app while dropping the reverse-proxy forwarding headers. Without it,
+  # Traefik's X-Forwarded-For stamps requests as "via proxy" and the route guard
+  # replies 403 LOCAL_ONLY to the dashboard's Export All button.
+  export_proxy:
+    image: nginx:${nginx_image_tag}
+    container_name: omniroute_export_proxy
+    hostname: omniroute_export_proxy
+    restart: ${restart_policy}
+    volumes:
+      - ./nginx-export.conf:/etc/nginx/conf.d/export.conf:ro
+    networks:
+      - web_net
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      # HTTPS route that only matches the export path
+      - "traefik.http.routers.export-omniroute.rule=Host(`${omniroute_main_domain}`) && PathPrefix(`/api/db-backups/exportAll`)"
+      - "traefik.http.routers.export-omniroute.entrypoints=web-secure"
+      - "traefik.http.routers.export-omniroute.tls=true"
+      - "traefik.http.routers.export-omniroute.tls.certresolver=myproduction"
+      - "traefik.http.routers.export-omniroute.service=export-omniroute"
+      - "traefik.http.routers.export-omniroute.priority=1000"
+      - "traefik.http.services.export-omniroute.loadBalancer.server.port=8080"
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  redis_data:
+    name: omniroute_redis_data
+    external: false
+  omniroute_data:
+    name: omniroute_data
+    external: false
