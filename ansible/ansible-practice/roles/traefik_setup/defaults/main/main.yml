@@ -8,7 +8,7 @@ traefik_image_tag: "v3.7.10"
 traefik_domain: "traefik.{{ main_domain }}"
 
 # Container restart policy (always, on-failure, unless-stopped)
-restart_policy: "on-failure"
+restart_policy: "unless-stopped"
 
 # Email address for Let's Encrypt ACME certificate notifications
 acme_email: hossein3piol@proton.me

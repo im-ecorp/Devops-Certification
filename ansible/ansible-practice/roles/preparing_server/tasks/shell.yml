@@ -23,16 +23,14 @@
   ansible.builtin.lineinfile:
     path: /etc/skel/.bashrc
     line: "[ -f /etc/profile.d/99-client-shell.sh ] && . /etc/profile.d/99-client-shell.sh"
-    marker: "# {mark} ANSIBLE CLIENT SHELL"
+    state: present
   tags:
     - shell
     - shell_customization
 
 - name: Find existing user home directories
   ansible.builtin.find:
-    paths:
-      - /root
-      - /home
+    paths: /home
     hidden: true
     file_type: directory
     recurse: false
@@ -45,11 +43,12 @@
   ansible.builtin.lineinfile:
     path: "{{ item.path }}/.bashrc"
     create: true
-    owner: "{{ item.path.split('/')[-1] }}"
+    owner: "{{ item.pw_name }}"
+    group: "{{ item.gr_name }}"
     mode: "0644"
     line: "[ -f /etc/profile.d/99-client-shell.sh ] && . /etc/profile.d/99-client-shell.sh"
-    marker: "# {mark} ANSIBLE CLIENT SHELL"
-  loop: "{{ home_dirs.files }}"
+    state: present
+  loop: "{{ ([{'path': '/root', 'pw_name': 'root', 'gr_name': 'root'}] + home_dirs.files) }}"
   tags:
     - shell
     - shell_customization
