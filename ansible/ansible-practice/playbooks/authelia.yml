@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure Authelia service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - authelia_setup

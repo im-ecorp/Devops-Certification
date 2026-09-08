@@ -1,0 +1,92 @@
+services:
+
+  # Authelia — authentication and authorization server
+  authelia:
+    image: authelia/authelia:${authelia_image_tag}
+    container_name: authelia
+    hostname: authelia
+    restart: ${restart_policy}
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ}
+      AUTHELIA_JWT_SECRET: ${AUTHELIA_JWT_SECRET}
+      AUTHELIA_SESSION_SECRET: ${AUTHELIA_SESSION_SECRET}
+      AUTHELIA_STORAGE_ENCRYPTION_KEY: ${AUTHELIA_STORAGE_ENCRYPTION_KEY}
+    volumes:
+      - ${service_dir}/config:/config
+    networks:
+      - web_net
+      - app_net
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-authelia.rule=Host(`${authelia_main_domain}`)"
+      - "traefik.http.routers.http-authelia.entrypoints=web"
+      - "traefik.http.routers.authelia.rule=Host(`${authelia_main_domain}`)"
+      - "traefik.http.routers.authelia.entrypoints=web-secure"
+      - "traefik.http.routers.authelia.tls=true"
+      - "traefik.http.routers.authelia.tls.certresolver=myproduction"
+      - "traefik.http.routers.authelia.service=authelia"
+      - "traefik.http.services.authelia.loadBalancer.server.port=9091"
+      - "traefik.http.middlewares.authelia.forwardAuth.address=http://authelia:9091/api/verify?rd=https://${authelia_main_domain}/"
+      - "traefik.http.middlewares.authelia.forwardAuth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authelia.forwardAuth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email"
+
+  db:
+    image: postgres:${postgres_image_tag}-alpine
+    container_name: authelia-db
+    hostname: authelia-db
+    restart: ${restart_policy}
+    environment:
+      POSTGRES_DB: authelia
+      POSTGRES_USER: authelia
+      POSTGRES_PASSWORD: ${authelia_db_password}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authelia -d authelia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:${redis_image_tag}-alpine
+    container_name: authelia-redis
+    hostname: authelia-redis
+    restart: ${restart_policy}
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  db_data:
+    name: authelia_db_data
+  redis_data:
+    name: authelia_redis_data

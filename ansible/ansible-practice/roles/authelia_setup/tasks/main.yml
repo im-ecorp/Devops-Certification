@@ -1,0 +1,7 @@
+---
+
+- name: Setup Authelia Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_authelia
+    - setup_authelia

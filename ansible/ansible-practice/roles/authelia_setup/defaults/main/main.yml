@@ -1,0 +1,35 @@
+---
+# Default variables for Authelia setup
+
+# Docker image version
+authelia_image_tag: "4.38.17"
+authelia_redis_image_tag: "7.2"
+authelia_postgres_image_tag: "16"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/authelia"
+
+# Domain name for Authelia (used by Traefik)
+authelia_main_domain: "auth.{{ main_domain }}"
+
+# Timezone
+authelia_timezone: "UTC"
+
+# Authelia SMTP settings
+authelia_smtp_host: "127.0.0.1"
+authelia_smtp_port: 587
+authelia_smtp_sender: "authelia@{{ main_domain }}"
+
+# Admin user defaults
+authelia_admin_username: "admin"
+authelia_admin_display_name: "Admin"
+authelia_admin_email: "admin@{{ main_domain }}"
+authelia_admin_groups:
+  - admins
+
+# OpenClaw access control
+authelia_openclaw_enabled: false
+authelia_openclaw_domain: "openclaw.{{ main_domain }}"

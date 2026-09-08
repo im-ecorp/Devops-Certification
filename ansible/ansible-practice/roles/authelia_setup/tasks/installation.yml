@@ -1,0 +1,85 @@
+---
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ service_dir }}"
+    - "{{ service_dir }}/config"
+  tags:
+    - preparing
+
+- name: Template configuration file
+  ansible.builtin.template:
+    src: configuration.yml.j2
+    dest: "{{ service_dir }}/config/configuration.yml"
+    mode: "0644"
+  notify: Restart Authelia
+  tags:
+    - preparing
+
+- name: Template users database file
+  ansible.builtin.template:
+    src: users_database.yml.j2
+    dest: "{{ service_dir }}/config/users_database.yml"
+    mode: "0640"
+  notify: Restart Authelia
+  tags:
+    - preparing
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: Restart Authelia
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+  notify: Restart Authelia
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+  register: compose_deploy
+  tags:
+    - deploy
+
+- name: Wait for Authelia container to be healthy
+  community.docker.docker_container_info:
+    name: authelia
+  register: authelia_container
+  until: authelia_container.container.State.Health.Status == "healthy"
+  retries: 30
+  delay: 10
+  tags:
+    - deploy
