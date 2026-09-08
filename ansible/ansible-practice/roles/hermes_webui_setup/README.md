@@ -14,6 +14,8 @@ Requirements
 - A Traefik reverse proxy exposing the `web_net` network
   (`traefik_setup` role)
 - `main_domain` and `project_dir` set in `inventory/group_vars/all/general.yml`
+- `rsync` on the target host — installed automatically by this role if missing,
+  used to export a filtered copy of the installed Agent source
 
 Role Variables
 --------------
@@ -33,6 +35,7 @@ See `defaults/main/main.yml` for all configurable variables.
 | `hermes_webui_domain` | `hermes.{{ main_domain }}` | Public domain served by Traefik |
 | `hermes_webui_url` | `https://{{ hermes_webui_domain }}` | Public base URL of the WebUI |
 | `hermes_webui_port` | `8787` | Port the app listens on inside the container |
+| `hermes_webui_password` | _(vaulted)_ | Login password for the WebUI; resolves to `vault_hermes_webui_password` — see Secrets below |
 | `hermes_webui_secure` | `1` | Force the Secure cookie flag (HTTPS via Traefik) |
 | `hermes_webui_allowed_origins` | `https://hermes.{{ main_domain }}` | Allowed public origin for requests |
 | `hermes_webui_trust_forwarded_host` | `1` | Trust the forwarded Host header from Traefik |
@@ -45,9 +48,10 @@ Layout
 ------
 
 - All configuration lives in `templates/.env.j2`, templated to
-  `{{ service_dir }}/.env` (mode `0600`). Values come from
-  `defaults/main/main.yml` (non-secret) and `defaults/main/vault.yml`
-  (secrets).
+  `{{ service_dir }}/.env` (mode `0600`, templated with `no_log` so the
+  password never reaches Ansible output/logs). Values come from
+  `defaults/main/main.yml` (non-secret) and `vars/main/vault.yml`
+  (secrets, resolved through `hermes_webui_password`).
 - `docker-compose.yml` reads those values through Compose interpolation
   (`${hermes_webui_password}`, `${hermes_webui_domain}`, ...) — the same split
   used by `docmost_setup`.
@@ -72,13 +76,17 @@ Layout
 Secrets (vault)
 ---------------
 
-Secrets live in `defaults/main/vault.yml`, encrypted with `ansible-vault`:
+Secrets live in `vars/main/vault.yml`, encrypted with `ansible-vault`. This is
+deliberately under `vars/` rather than `defaults/`: role vars take precedence
+over inventory/group_vars, so the vaulted value can't be silently overridden
+or left blank by an unrelated group_vars/host_vars entry the way a `defaults/`
+value could.
 
-    ansible-vault edit defaults/main/vault.yml
+    ansible-vault edit vars/main/vault.yml
 
 | Variable | Description |
 |---|---|
-| `hermes_webui_password` | Password required to log in to the WebUI. Mandatory because the service is publicly reachable through Traefik. |
+| `vault_hermes_webui_password` | Password required to log in to the WebUI. Mandatory because the service is publicly reachable through Traefik. Exposed to the rest of the role as `hermes_webui_password` (see `defaults/main/main.yml`). |
 
 Existing Hermes home safety
 ---------------------------

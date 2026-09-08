@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  author: local
+  description: Deploy Hermes WebUI with Docker Compose, reverse-proxied through Traefik.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags:
+    - hermes
+    - docker
+    - traefik
+    - webui
+
+dependencies: []

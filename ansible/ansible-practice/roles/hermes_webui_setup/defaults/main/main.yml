@@ -32,6 +32,11 @@ hermes_webui_url: "https://{{ hermes_webui_domain }}"
 # Container port served to Traefik (not published on the host)
 hermes_webui_port: 8787
 
+# Password required to log in to the WebUI. Mandatory because the service is
+# publicly reachable through Traefik. The actual value is vaulted in
+# vars/main/vault.yml as vault_hermes_webui_password.
+hermes_webui_password: "{{ vault_hermes_webui_password }}"
+
 # HTTPS / reverse-proxy settings (the service runs behind Traefik)
 hermes_webui_secure: 1
 hermes_webui_allowed_origins: "{{ hermes_webui_url }}"

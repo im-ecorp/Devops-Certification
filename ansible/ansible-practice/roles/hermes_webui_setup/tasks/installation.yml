@@ -17,7 +17,14 @@
   ansible.builtin.file:
     path: "{{ service_dir }}"
     state: directory
-    mode: "0755"
+    mode: "0750"
+  tags:
+    - preparing
+
+- name: Ensure rsync is installed
+  ansible.builtin.package:
+    name: rsync
+    state: present
   tags:
     - preparing
 
@@ -147,6 +154,7 @@
     src: .env.j2
     dest: "{{ service_dir }}/.env"
     mode: "0600"
+  no_log: true
   tags:
     - preparing
 
