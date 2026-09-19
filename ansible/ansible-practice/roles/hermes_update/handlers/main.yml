@@ -1,0 +1,9 @@
+---
+- name: Restart Hermes gateway
+  ansible.builtin.command:
+    argv:
+      - "{{ hermes_update_binary }}"
+      - gateway
+      - restart
+      - --system
+  changed_when: true

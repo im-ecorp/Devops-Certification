@@ -1,8 +1,0 @@
----
-
-- name: Install and configure Hermes WebUI service
-  hosts: all
-  become: true
-  gather_facts: true
-  roles:
-    - hermes_webui_setup

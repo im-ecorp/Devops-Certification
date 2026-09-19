@@ -1,0 +1,66 @@
+---
+- name: Check Hermes Agent update availability
+  ansible.builtin.command:
+    argv:
+      - "{{ hermes_update_binary }}"
+      - update
+      - --check
+  register: hermes_update_check
+  changed_when: false
+  tags:
+    - hermes_update
+
+- name: Show Hermes Agent update status
+  ansible.builtin.debug:
+    msg: "{{ hermes_update_check.stdout_lines }}"
+  tags:
+    - hermes_update
+
+- name: Update Hermes Agent without a backup
+  ansible.builtin.command:
+    argv:
+      - "{{ hermes_update_binary }}"
+      - update
+      - --yes
+      - --no-backup
+      - --no-gateway-restart
+  register: hermes_update_result
+  changed_when: true
+  when: "'Update available' in hermes_update_check.stdout"
+  notify: Restart Hermes gateway
+  tags:
+    - hermes_update
+
+- name: Apply pending Hermes gateway restart
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - hermes_update
+
+- name: Verify Hermes gateway is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - hermes-gateway.service
+  register: hermes_gateway_active
+  changed_when: false
+  tags:
+    - hermes_update
+
+- name: Read installed Hermes Agent version
+  ansible.builtin.command:
+    argv:
+      - "{{ hermes_update_binary }}"
+      - --version
+  register: hermes_update_version
+  changed_when: false
+  tags:
+    - hermes_update
+
+- name: Show final Hermes Agent state
+  ansible.builtin.debug:
+    msg:
+      - "Gateway: {{ hermes_gateway_active.stdout }}"
+      - "Version: {{ hermes_update_version.stdout_lines | first }}"
+  tags:
+    - hermes_update

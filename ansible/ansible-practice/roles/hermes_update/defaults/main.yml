@@ -1,0 +1,3 @@
+---
+# Root-mode Hermes Agent launcher installed by the official installer.
+hermes_update_binary: /usr/local/bin/hermes

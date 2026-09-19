@@ -1,0 +1,8 @@
+---
+- name: Update Hermes Agent and restart its gateway
+  hosts: all
+  become: true
+  gather_facts: false
+
+  roles:
+    - hermes_update
