@@ -1,0 +1,31 @@
+---
+- name: Reboot servers
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: "{{ reboot_serial | default('100%') }}"
+
+  tasks:
+    - name: Reboot the server and wait for it to come back
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by Ansible"
+        pre_reboot_delay: 5
+        post_reboot_delay: 20
+        reboot_timeout: 600
+        connect_timeout: 15
+        test_command: whoami
+      tags:
+        - reboot
+
+    - name: Report uptime after reboot
+      ansible.builtin.command: uptime -p
+      register: uptime_out
+      changed_when: false
+      tags:
+        - reboot
+
+    - name: Show uptime
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} is back up: {{ uptime_out.stdout }}"
+      tags:
+        - reboot
