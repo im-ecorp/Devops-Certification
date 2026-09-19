@@ -1,0 +1,113 @@
+---
+# Post-deploy verification. These checks assert the properties whose absence
+# produced "the path /root/mygit and the hermes CLI are absent": a healthy
+# container is not the same thing as an agent that can do the job.
+
+- name: Wait for the container healthcheck to report healthy
+  ansible.builtin.command:
+    cmd: >-
+      docker inspect --format
+      '{% raw %}{{ .State.Health.Status }}{% endraw %}'
+      hermes-webui
+  register: hermes_webui_container_health
+  changed_when: false
+  retries: "{{ hermes_webui_health_retries }}"
+  delay: "{{ hermes_webui_health_delay }}"
+  until: hermes_webui_container_health.stdout | trim == 'healthy'
+
+- name: Verify the agent workspaces are mounted inside the container
+  community.docker.docker_container_exec:
+    container: hermes-webui
+    argv:
+      - /bin/sh
+      - "-c"
+      - "test -d '{{ item.path | default(item) }}' && ls -A '{{ item.path | default(item) }}' | head -1"
+  register: hermes_webui_workspace_check
+  changed_when: false
+  failed_when:
+    - hermes_webui_workspace_check.rc != 0 or hermes_webui_workspace_check.stdout | trim | length == 0
+  loop: "{{ hermes_webui_workspaces }}"
+  loop_control:
+    label: "{{ item.path | default(item) }}"
+  when: hermes_webui_verify_agent_toolchain | bool
+
+- name: Verify the bundled hermes CLI resolves on the container PATH
+  community.docker.docker_container_exec:
+    container: hermes-webui
+    argv:
+      - /bin/sh
+      - "-c"
+      - "command -v hermes"
+  register: hermes_webui_cli_check
+  changed_when: false
+  failed_when: hermes_webui_cli_check.rc != 0
+  when: hermes_webui_verify_agent_toolchain | bool
+
+- name: Verify the SSH private key is readable inside the container
+  community.docker.docker_container_exec:
+    container: hermes-webui
+    argv:
+      - /bin/sh
+      - "-c"
+      - "test -r ~/.ssh/{{ hermes_webui_ssh_private_key_name }}"
+  register: hermes_webui_ssh_check
+  changed_when: false
+  failed_when: hermes_webui_ssh_check.rc != 0
+  when:
+    - hermes_webui_verify_agent_toolchain | bool
+    - hermes_webui_ssh_enabled | bool
+
+# End-to-end: the path the agent will actually use to run a playbook. Proves
+# the host alias resolves, the key authenticates, and ansible-playbook exists
+# on the other end.
+- name: Verify the agent can run Ansible on the host over SSH
+  community.docker.docker_container_exec:
+    container: hermes-webui
+    argv:
+      - ssh
+      - "-p"
+      - "{{ hermes_webui_host_ssh_port }}"
+      - "-o"
+      - "BatchMode=yes"
+      - "-o"
+      - "StrictHostKeyChecking=no"
+      - "-o"
+      - "UserKnownHostsFile=/dev/null"
+      - "-o"
+      - "ConnectTimeout=10"
+      - "-i"
+      - "{{ hermes_webui_container_home }}/.ssh/{{ hermes_webui_ssh_private_key_name }}"
+      - "root@{{ hermes_webui_host_alias }}"
+      - "{{ hermes_webui_host_executor_env_prefix | trim }} ansible-playbook --version"
+  register: hermes_webui_executor_check
+  changed_when: false
+  failed_when: hermes_webui_executor_check.rc != 0
+  when:
+    - hermes_webui_verify_agent_toolchain | bool
+    - hermes_webui_host_executor_enabled | bool
+    - hermes_webui_ssh_enabled | bool
+
+- name: Probe the public URL through Traefik
+  ansible.builtin.uri:
+    url: "{{ hermes_webui_url }}/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: hermes_webui_public_health
+  retries: 10
+  delay: 6
+  until: hermes_webui_public_health.status == 200
+  when: hermes_webui_verify_public_url | bool
+
+- name: Report the deployed state
+  ansible.builtin.debug:
+    msg: |-
+      Hermes WebUI is healthy at {{ hermes_webui_url }}
+      Image:            {{ hermes_webui_effective_image | trim }}
+      Runtime home:     {{ hermes_webui_container_home }} (root-owned: {{ hermes_webui_root_owned_home }})
+      SSH passthrough:  {{ 'yes (' ~ hermes_webui_ssh_dir ~ ', read-only)' if hermes_webui_ssh_enabled | bool else 'no' }}
+      Host executor:    {{ hermes_webui_host_alias ~ ':' ~ hermes_webui_host_ssh_port if hermes_webui_host_executor_enabled | bool else 'disabled' }}
+      Agent workspaces:
+      {% for workspace in hermes_webui_workspaces %}
+        - {{ workspace.path | default(workspace) }}{{ ' (read-only)' if workspace.read_only | default(false) else '' }}
+      {% endfor %}

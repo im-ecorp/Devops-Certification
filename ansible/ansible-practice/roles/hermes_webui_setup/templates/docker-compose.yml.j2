@@ -1,23 +1,29 @@
+# {{ ansible_managed }}
+#
+# Scalar settings are interpolated from .env (mode 0600); structure and the
+# mount list come from the role so that secrets stay out of this file.
+---
 services:
 
   hermes-webui:
-    image: ghcr.io/nesquena/hermes-webui:${image_tag}
+    image: ${hermes_webui_image}
     container_name: hermes-webui
     hostname: hermes-webui
     restart: ${restart_policy}
     init: true
 {% if hermes_webui_root_owned_home | bool %}
-    entrypoint: ["/bin/bash", "/opt/hermes-webui/root-entrypoint.sh"]
+    entrypoint: ["/bin/bash", "{{ hermes_webui_container_entrypoint }}"]
 {% endif %}
     environment:
+      PATH: ${hermes_webui_container_path}
       WANTED_UID: ${wanted_uid}
       WANTED_GID: ${wanted_gid}
-      HERMES_HOME: /home/hermeswebui/.hermes
-      HERMES_CONFIG_PATH: /home/hermeswebui/.hermes/config.yaml
-      HERMES_WEBUI_AGENT_DIR: /opt/hermes
+      HERMES_HOME: {{ hermes_webui_container_hermes_home }}
+      HERMES_CONFIG_PATH: {{ hermes_webui_container_hermes_home }}/config.yaml
+      HERMES_WEBUI_AGENT_DIR: {{ hermes_webui_container_agent_dir }}
       HERMES_WEBUI_HOST: 0.0.0.0
       HERMES_WEBUI_PORT: ${hermes_webui_port}
-      HERMES_WEBUI_STATE_DIR: /var/lib/hermes-webui
+      HERMES_WEBUI_STATE_DIR: {{ hermes_webui_container_state_dir }}
       HERMES_WEBUI_SKIP_ONBOARDING: ${hermes_webui_skip_onboarding}
       HERMES_WEBUI_PASSWORD: ${hermes_webui_password}
       HERMES_WEBUI_SECURE: ${hermes_webui_secure}
@@ -29,37 +35,83 @@ services:
 {% if hermes_webui_root_owned_home | bool %}
       HERMES_WEBUI_ROOT_HOME_MODE: 1
 {% endif %}
+{% if hermes_webui_host_executor_enabled | bool %}
+      # How the agent reaches the host to run Ansible; see the role README.
+      # A non-interactive ssh session carries no locale, and Ansible refuses to
+      # start without a UTF-8 one, so the prefix is part of the contract.
+      HERMES_HOST_EXECUTOR: "{{ hermes_webui_host_alias }}:{{ hermes_webui_host_ssh_port }}"
+      # UserKnownHostsFile=/dev/null because ~/.ssh is mounted read-only, so
+      # ssh cannot record the host key and would warn on every invocation.
+      HERMES_HOST_EXECUTOR_SSH: "ssh -p {{ hermes_webui_host_ssh_port }} -i ~/.ssh/{{ hermes_webui_ssh_private_key_name }} -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR root@{{ hermes_webui_host_alias }}"
+      HERMES_HOST_EXECUTOR_ENV: "{{ hermes_webui_host_executor_env_prefix | trim }}"
+    # Publishes the Docker host itself under a stable name, so the agent can
+    # SSH back to the machine that has ansible-core, the collections, the
+    # inventory and the vault password.
+    extra_hosts:
+      - "{{ hermes_webui_host_alias }}:host-gateway"
+{% endif %}
     volumes:
-      - "{{ hermes_webui_home_dir }}:/home/hermeswebui/.hermes"
-      - "{{ hermes_webui_agent_export_dir }}:/opt/hermes:ro"
-      - "{{ hermes_webui_state_dir }}:/var/lib/hermes-webui"
+      # Existing Hermes CLI home: config.yaml, auth.json and the session DB.
+      - "{{ hermes_webui_home_dir }}:{{ hermes_webui_container_hermes_home }}"
+      # Filtered copy of the installed Agent source.
+      - "{{ hermes_webui_agent_export_dir }}:{{ hermes_webui_container_agent_dir }}:ro"
+      # WebUI-owned state, deliberately outside the CLI home.
+      - "{{ hermes_webui_state_dir }}:{{ hermes_webui_container_state_dir }}"
 {% if hermes_webui_root_owned_home | bool %}
-      - "{{ service_dir }}/root-entrypoint.sh:/opt/hermes-webui/root-entrypoint.sh:ro"
+      - "{{ hermes_webui_entrypoint_path }}:{{ hermes_webui_container_entrypoint }}:ro"
+{% endif %}
+{% if hermes_webui_workspaces | length > 0 %}
+      # Agent workspaces, mounted at their host paths so a path typed in the
+      # WebUI resolves to the same file the host sees.
+{% for workspace in hermes_webui_workspaces %}
+{% set workspace_path = workspace.path | default(workspace) %}
+      - "{{ workspace_path }}:{{ workspace_path }}{{ ':ro' if workspace.read_only | default(false) else '' }}"
+{% endfor %}
+{% endif %}
+{% if hermes_webui_ssh_enabled | bool %}
+      # Read-only SSH material so Ansible run from the WebUI can reach the
+      # inventory hosts. Resolves as ~/.ssh for the in-container account.
+      - "{{ hermes_webui_ssh_dir }}:{{ hermes_webui_container_home }}/.ssh:ro"
 {% endif %}
     security_opt:
       - no-new-privileges:true
+    mem_limit: ${hermes_webui_memory_limit}
+    cpus: ${hermes_webui_cpu_limit}
     stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: ${hermes_webui_log_max_size}
+        max-file: ${hermes_webui_log_max_file}
     networks:
-      - web_net
+{% for network in hermes_webui_service_networks %}
+      - {{ network }}
+{% endfor %}
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health')"]
+      test:
+        - "CMD"
+        - "python3"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ hermes_webui_port }}/health')"
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=web_net"
+      - "traefik.docker.network={{ hermes_webui_traefik_network }}"
       - "traefik.http.routers.http-hermes-webui.rule=Host(`${hermes_webui_domain}`)"
       - "traefik.http.routers.http-hermes-webui.entrypoints=web"
       - "traefik.http.routers.hermes-webui.rule=Host(`${hermes_webui_domain}`)"
       - "traefik.http.routers.hermes-webui.entrypoints=web-secure"
       - "traefik.http.routers.hermes-webui.tls=true"
-      - "traefik.http.routers.hermes-webui.tls.certresolver=myproduction"
+      - "traefik.http.routers.hermes-webui.tls.certresolver={{ hermes_webui_traefik_certresolver }}"
       - "traefik.http.routers.hermes-webui.service=hermes-webui"
       - "traefik.http.services.hermes-webui.loadBalancer.server.port=${hermes_webui_port}"
 
 networks:
-  web_net:
-    name: web_net
+{% for network in hermes_webui_service_networks %}
+  {{ network }}:
+    name: {{ network }}
     external: true
+{% endfor %}

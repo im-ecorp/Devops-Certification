@@ -1,8 +1,27 @@
 ---
-# Default variables for Hermes WebUI setup
+# Default variables for Hermes WebUI setup.
+#
+# The WebUI runs the Hermes Agent *inside a container*, using the official
+# published image unmodified. Anything the agent is expected to read must
+# therefore be mounted explicitly (hermes_webui_workspaces), and anything it is
+# expected to execute must either exist in that image or be reached on the host
+# over SSH (hermes_webui_host_executor_enabled).
 
-# Hermes WebUI Docker image tag.
+# --- Image ------------------------------------------------------------------
+# Published at https://github.com/nesquena/hermes-webui/pkgs/container/hermes-webui
+
+hermes_webui_image_repository: "ghcr.io/nesquena/hermes-webui"
+
+# Upstream tag to track. Version tags such as "0.50.43" are also published;
+# prefer one of those plus a digest pin for anything you care about.
 hermes_webui_image_tag: "latest"
+
+# Immutable digest, e.g. "sha256:20fb063b54bb795cdc37caea4f1d67bf283ce8a733b75cab21848dec6e05f6a1".
+# Empty means "resolve by tag", which lets a re-run silently pull a different
+# build; preflight warns when this is unset.
+hermes_webui_image_digest: ""
+
+# --- Host layout ------------------------------------------------------------
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "unless-stopped"
@@ -19,11 +38,97 @@ hermes_webui_agent_export_dir: "{{ service_dir }}/agent-source"
 # The WebUI can still read CLI sessions from hermes_webui_home_dir/state.db.
 hermes_webui_state_dir: "{{ service_dir }}/state"
 
+# --- Workspaces -------------------------------------------------------------
+
+# Host directories the agent must be able to read and write, mounted at the
+# *same* absolute path inside the container so that a path you type in the
+# WebUI resolves to the same file the host sees. Each entry is either a string
+# or a mapping {path: /host/path, read_only: false}.
+#
+# Without this, the agent answers "the path /root/mygit is absent" — it is
+# reporting its own filesystem accurately.
+hermes_webui_workspaces:
+  - path: "/root/mygit"
+    read_only: false
+
+# Require every declared workspace to exist on the host before deploying,
+# rather than letting Docker create an empty directory in its place.
+hermes_webui_workspaces_must_exist: true
+
+# --- Running Ansible from the WebUI -----------------------------------------
+
+# The official image ships git, ssh, rsync and uv, but no Ansible, and this
+# role does not modify the image. The agent therefore runs playbooks on the
+# host — the machine that already has ansible-core, the collections, the vault
+# password file and the inventory — by connecting back over SSH.
+#
+# This publishes the host under hermes_webui_host_alias via Docker's
+# host-gateway, so the agent can run:
+#   ssh -p {{ hermes_webui_host_ssh_port }} root@{{ hermes_webui_host_alias }} \
+#       'cd <repo>/ansible/ansible-practice && ansible-playbook playbooks/hermes.yml'
+hermes_webui_host_executor_enabled: true
+hermes_webui_host_alias: "host.docker.internal"
+
+# A non-interactive `ssh host command` session inherits no locale, and Ansible
+# refuses to start without a UTF-8 one ("Detected None"). Every remote
+# invocation must carry these, so they are part of the contract rather than
+# something the agent has to rediscover.
+hermes_webui_host_executor_env:
+  LC_ALL: "C.UTF-8"
+  LANG: "C.UTF-8"
+
+# SSH port the host's sshd listens on, as reachable from the container.
+hermes_webui_host_ssh_port: "{{ ansible_port | default(22) }}"
+
+# Mount the host's SSH material read-only so those connections, and any
+# Ansible run that follows, can authenticate.
+#
+# SECURITY: this grants every authenticated WebUI session the ability to log in
+# wherever these keys are authorised — including back into this host as root.
+# Keep hermes_webui_password strong, put the service behind Authelia if
+# available, or point hermes_webui_ssh_dir at a dedicated, narrowly-authorised
+# key directory.
+hermes_webui_ssh_enabled: true
+hermes_webui_ssh_dir: "/root/.ssh"
+hermes_webui_ssh_private_key_name: "id_rsa"
+
+# --- Runtime ----------------------------------------------------------------
+
 # The official WebUI entrypoint cannot remap its runtime account to UID 0
 # safely. When the existing Hermes home is root-owned, use the guarded wrapper
 # shipped by this role. It skips recursive chown/chmod and runs inside the
 # container as root so the host-owned Hermes data keeps its ownership.
 hermes_webui_allow_root_runtime: true
+
+# The bundled `hermes` CLI lives in the app venv, which upstream leaves off
+# PATH. Appended (not prepended) so the system python3 still wins.
+hermes_webui_app_venv_bin: "/app/venv/bin"
+
+# PATH handed to the container, so the `hermes` CLI resolves for agent shell
+# commands without a login shell being involved.
+hermes_webui_container_path: >-
+  /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:{{ hermes_webui_app_venv_bin }}
+
+# Resource limits. Agent runs can be memory-hungry, and an unbounded container
+# can take the whole host down with it.
+hermes_webui_memory_limit: "4g"
+hermes_webui_cpu_limit: "2.0"
+
+# Container log rotation. An agent that talks a lot should not fill the disk.
+hermes_webui_log_max_size: "20m"
+hermes_webui_log_max_file: "5"
+
+# --- Networking -------------------------------------------------------------
+
+# Networks this role ensures exist on the host.
+hermes_webui_docker_networks:
+  - "web_net"
+  - "app_net"
+
+# Networks the container itself joins. No host port is published; Traefik
+# reaches the container over web_net.
+hermes_webui_service_networks:
+  - "web_net"
 
 # Domain name for Hermes WebUI (used by Traefik)
 hermes_webui_domain: "hermes.{{ main_domain }}"
@@ -32,10 +137,20 @@ hermes_webui_url: "https://{{ hermes_webui_domain }}"
 # Container port served to Traefik (not published on the host)
 hermes_webui_port: 8787
 
+hermes_webui_traefik_network: "web_net"
+hermes_webui_traefik_certresolver: "myproduction"
+
+# --- Credentials ------------------------------------------------------------
+
 # Password required to log in to the WebUI. Mandatory because the service is
 # publicly reachable through Traefik. The actual value is vaulted in
 # vars/main/vault.yml as vault_hermes_webui_password.
 hermes_webui_password: "{{ vault_hermes_webui_password }}"
+
+# Refuse to deploy a publicly-routed agent behind a trivially short password.
+hermes_webui_password_min_length: 16
+
+# --- Application settings ---------------------------------------------------
 
 # HTTPS / reverse-proxy settings (the service runs behind Traefik)
 hermes_webui_secure: 1
@@ -49,3 +164,18 @@ hermes_webui_skip_onboarding: 1
 
 # Never rewrite credential modes in the existing Hermes CLI home.
 hermes_webui_skip_chmod: 1
+
+# --- Verification -----------------------------------------------------------
+
+# Wait for the container's own healthcheck to report healthy. This is the
+# authoritative readiness signal and needs no DNS or public reachability.
+hermes_webui_health_retries: 30
+hermes_webui_health_delay: 10
+
+# Prove the agent can reach what it will be asked to use: the workspaces are
+# mounted, `hermes` resolves on PATH, and the host executor answers.
+hermes_webui_verify_agent_toolchain: true
+
+# Additionally probe the public URL through Traefik. Off by default: a failure
+# here means DNS/ACME/Traefik, not the service, and should not fail this role.
+hermes_webui_verify_public_url: false

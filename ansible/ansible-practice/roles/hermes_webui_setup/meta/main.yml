@@ -1,7 +1,12 @@
 ---
 galaxy_info:
+  role_name: hermes_webui_setup
+  namespace: ecorp
   author: local
-  description: Deploy Hermes WebUI with Docker Compose, reverse-proxied through Traefik.
+  description: >-
+    Deploy Hermes WebUI with Docker Compose behind Traefik, with the agent's
+    workspaces, SSH material and Ansible toolchain mounted or built in so the
+    in-container agent can operate on the host's repositories.
   license: MIT
   min_ansible_version: "2.15"
   platforms:
@@ -16,5 +21,6 @@ galaxy_info:
     - docker
     - traefik
     - webui
+    - ansible
 
 dependencies: []

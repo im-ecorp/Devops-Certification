@@ -1,157 +1,226 @@
-Role Name
-=========
+hermes_webui_setup
+==================
 
 Deploy [Hermes WebUI](https://github.com/nesquena/hermes-webui) (web interface for
 Hermes Agent) with Docker Compose via Ansible, reverse-proxied through Traefik.
 The container binds only to the internal `web_net` network and is reached through
 Traefik labels — no host port is published.
 
+The [official published image](https://github.com/nesquena/hermes-webui/pkgs/container/hermes-webui)
+is used **unmodified**. This role builds nothing.
+
+The point of the role
+---------------------
+
+The WebUI runs the Hermes Agent *inside a container*. That single fact drives
+almost every decision here, and it is the cause of the failure this role exists
+to prevent:
+
+> The path /root/mygit and the hermes CLI are absent. This WebUI session is
+> running in an isolated container that lacks your repositories, Ansible, and
+> Hermes agent.
+
+The agent was not confused — it was describing its own filesystem accurately.
+A container that is `healthy` is not the same thing as an agent that can do the
+job. So the role explicitly provides three things, and then **verifies all
+three after deploying**:
+
+| The agent needs | How it gets it |
+|---|---|
+| Your repositories | `hermes_webui_workspaces`, bind-mounted at their **host paths** |
+| The `hermes` CLI | Already in the image at `/app/venv/bin`; put on `PATH` via `hermes_webui_container_path` |
+| Ansible | Not in the image. The agent SSHes back to the host and runs it there — see below |
+
+Running Ansible from the WebUI
+------------------------------
+
+The image ships `git`, `ssh`, `rsync` and `uv`, but no Ansible. Rather than
+modify the image, the agent runs playbooks **on the host** — the machine that
+already has `ansible-core`, the collections, the inventory, the vault password
+file and the SSH keys.
+
+`hermes_webui_host_executor_enabled` publishes the Docker host under
+`host.docker.internal` via `host-gateway`, and the container environment
+carries the exact invocation:
+
+```sh
+$HERMES_HOST_EXECUTOR_SSH "$HERMES_HOST_EXECUTOR_ENV bash -lc 'cd /root/mygit/Devops-Certification/ansible/ansible-practice && ansible-playbook playbooks/hermes-web-ui.yml'"
+```
+
+which expands to:
+
+```sh
+ssh -p 3031 -i ~/.ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR root@host.docker.internal \
+    "LC_ALL=C.UTF-8 LANG=C.UTF-8 bash -lc '...'"
+```
+
+Two details are load-bearing, and both are baked into
+`HERMES_HOST_EXECUTOR_ENV` / `HERMES_HOST_EXECUTOR_SSH` so nothing has to
+rediscover them:
+
+- **`LC_ALL` / `LANG` are mandatory.** A non-interactive `ssh host command`
+  session inherits no locale, and Ansible aborts with
+  `Ansible requires the locale encoding to be UTF-8; Detected None`.
+- **`UserKnownHostsFile=/dev/null`.** `~/.ssh` is mounted read-only, so `ssh`
+  cannot record the host key and would warn on every single invocation.
+
+> **Security.** Mounting `hermes_webui_ssh_dir` gives every authenticated WebUI
+> session the ability to log in wherever those keys are authorised — including
+> back into this host as root. The service is published on the public internet
+> behind one password. Keep `vault_hermes_webui_password` strong (preflight
+> enforces `hermes_webui_password_min_length`), put the service behind Authelia
+> if available, or point `hermes_webui_ssh_dir` at a dedicated, narrowly
+> authorised key directory. Set `hermes_webui_ssh_enabled: false` to drop this
+> capability entirely.
+
 Requirements
 ------------
 
-- Docker and Docker Compose v2 installed on the target host (`docker_setup` role)
-- The `community.docker` Ansible collection (see `requirements.yml`)
-- A Traefik reverse proxy exposing the `web_net` network
-  (`traefik_setup` role)
-- `main_domain` and `project_dir` set in `inventory/group_vars/all/general.yml`
-- `rsync` on the target host — installed automatically by this role if missing,
-  used to export a filtered copy of the installed Agent source
+- Docker and Docker Compose v2 on the target host (`docker_setup` role)
+- The `community.docker` collection (see `requirements.yml`)
+- A Traefik reverse proxy exposing `web_net` (`traefik_setup` role)
+- `main_domain` and `project_dir` in `inventory/group_vars/all/general.yml`
+- An existing Hermes CLI installation on the host: `/root/.hermes/config.yaml`,
+  `/root/.hermes/state.db` and `/usr/local/lib/hermes-agent`. The role asserts
+  these rather than creating them, because an auto-created empty home would
+  quietly start the WebUI with no configuration.
+- `rsync` on the target host — installed by the role if missing
+
+Usage
+-----
+
+Membership is explicit; the playbook targets the `hermes_webui` group rather
+than `all`, so a public, key-bearing agent is never fanned out across the fleet
+by accident.
+
+```yaml
+# inventory/hosts.yml
+all:
+  children:
+    hermes_webui:
+      hosts:
+        hetzner-cactus: {}
+```
+
+```sh
+ansible-playbook playbooks/hermes-web-ui.yml
+```
+
+Task files and tags
+-------------------
+
+| File | Tags | What it does |
+|---|---|---|
+| `preflight.yml` | `preparing`, `hermes_webui_preflight` | Asserts every precondition before anything is changed |
+| `deploy.yml` | `deploy`, `hermes_webui_deploy` | Networks, directories, Agent source export, templates, Compose up |
+| `verify.yml` | `verify`, `hermes_webui_verify` | Proves the agent can actually reach its workspaces, CLI and Ansible |
+
+`install_hermes_webui` and `setup_hermes_webui` run all three.
 
 Role Variables
 --------------
 
-See `defaults/main/main.yml` for all configurable variables.
+See `defaults/main/main.yml` for the full set; `vars/main/main.yml` holds the
+image-fixed container paths, which are not meant to be overridden.
+
+### Image
 
 | Variable | Default | Description |
 |---|---|---|
-| `hermes_webui_image_tag` | `latest` | Hermes WebUI Docker image tag |
-| `restart_policy` | `unless-stopped` | Container restart policy |
-| `service_dir` | `{{ project_dir }}/hermes-webui` | Service directory on the remote host |
-| `hermes_webui_home_dir` | `/root/.hermes` | Existing Hermes CLI home mounted as `~/.hermes` |
+| `hermes_webui_image_repository` | `ghcr.io/nesquena/hermes-webui` | Published image |
+| `hermes_webui_image_tag` | `latest` | Tag to track; version tags such as `0.50.43` are also published |
+| `hermes_webui_image_digest` | `""` | Digest pin. Empty tracks a mutable tag, and preflight warns |
+
+Pin the digest in production. `latest` is a distinct build from the version
+tags, so pin whichever you actually tested:
+
+```sh
+docker image inspect ghcr.io/nesquena/hermes-webui:latest --format '{{index .RepoDigests 0}}'
+```
+
+### Workspaces and host access
+
+| Variable | Default | Description |
+|---|---|---|
+| `hermes_webui_workspaces` | `[{path: /root/mygit}]` | Host dirs mounted at the **same absolute path** in the container. String or `{path, read_only}` |
+| `hermes_webui_workspaces_must_exist` | `true` | Fail if a declared workspace is missing, instead of letting Docker mount an empty dir over it |
+| `hermes_webui_host_executor_enabled` | `true` | Publish the host as `host.docker.internal` so the agent can run Ansible there |
+| `hermes_webui_host_alias` | `host.docker.internal` | Name the host is published under |
+| `hermes_webui_host_ssh_port` | `{{ ansible_port \| default(22) }}` | Host sshd port as reachable from the container |
+| `hermes_webui_host_executor_env` | `LC_ALL`/`LANG` = `C.UTF-8` | Locale every remote command must carry |
+| `hermes_webui_ssh_enabled` | `true` | Mount SSH material read-only |
+| `hermes_webui_ssh_dir` | `/root/.ssh` | Host SSH directory, mounted at the runtime account's `~/.ssh` |
+| `hermes_webui_ssh_private_key_name` | `id_rsa` | Key the executor uses |
+
+### Hermes data
+
+| Variable | Default | Description |
+|---|---|---|
+| `hermes_webui_home_dir` | `/root/.hermes` | Existing Hermes CLI home, mounted as the container's `~/.hermes` |
 | `hermes_webui_agent_dir` | `/usr/local/lib/hermes-agent` | Official installer source directory |
-| `hermes_webui_agent_export_dir` | `{{ service_dir }}/agent-source` | Filtered source export mounted read-only at `/opt/hermes` |
+| `hermes_webui_agent_export_dir` | `{{ service_dir }}/agent-source` | Filtered source export, mounted read-only at `/opt/hermes` |
 | `hermes_webui_state_dir` | `{{ service_dir }}/state` | Separate writable WebUI sessions/settings directory |
 | `hermes_webui_allow_root_runtime` | `true` | Permit the guarded root-owned-home entrypoint |
-| `hermes_webui_domain` | `hermes.{{ main_domain }}` | Public domain served by Traefik |
-| `hermes_webui_url` | `https://{{ hermes_webui_domain }}` | Public base URL of the WebUI |
-| `hermes_webui_port` | `8787` | Port the app listens on inside the container |
-| `hermes_webui_password` | _(vaulted)_ | Login password for the WebUI; resolves to `vault_hermes_webui_password` — see Secrets below |
-| `hermes_webui_secure` | `1` | Force the Secure cookie flag (HTTPS via Traefik) |
-| `hermes_webui_allowed_origins` | `https://hermes.{{ main_domain }}` | Allowed public origin for requests |
-| `hermes_webui_trust_forwarded_host` | `1` | Trust the forwarded Host header from Traefik |
-| `hermes_webui_trust_forwarded_for` | `1` | Trust the X-Forwarded-For header from Traefik |
-| `hermes_webui_trust_forwarded_proto` | `1` | Trust the X-Forwarded-Proto header from Traefik |
 | `hermes_webui_skip_onboarding` | `1` | Use the existing `config.yaml` without onboarding |
 | `hermes_webui_skip_chmod` | `1` | Prevent WebUI startup from rewriting CLI credential modes |
+
+### Runtime, networking and credentials
+
+| Variable | Default | Description |
+|---|---|---|
+| `restart_policy` | `unless-stopped` | Container restart policy |
+| `service_dir` | `{{ project_dir }}/hermes-webui` | Service directory on the remote host |
+| `hermes_webui_container_path` | `…:/app/venv/bin` | `PATH` in the container, so `hermes` resolves |
+| `hermes_webui_memory_limit` | `4g` | Memory ceiling — an unbounded agent can take the host down |
+| `hermes_webui_cpu_limit` | `2.0` | CPU ceiling |
+| `hermes_webui_log_max_size` / `_file` | `20m` / `5` | Log rotation |
+| `hermes_webui_domain` | `hermes.{{ main_domain }}` | Public domain served by Traefik |
+| `hermes_webui_port` | `8787` | Port the app listens on inside the container |
+| `hermes_webui_password` | _(vaulted)_ | Login password; resolves to `vault_hermes_webui_password` |
+| `hermes_webui_password_min_length` | `16` | Preflight refuses anything shorter |
+
+### Verification
+
+| Variable | Default | Description |
+|---|---|---|
+| `hermes_webui_verify_agent_toolchain` | `true` | Assert workspaces, `hermes`, the SSH key and the host executor all work |
+| `hermes_webui_verify_public_url` | `false` | Also probe `https://…/health`. Off because a failure means DNS/ACME/Traefik, not the service |
+| `hermes_webui_health_retries` / `_delay` | `30` / `10` | Container healthcheck wait |
+
+The root-owned-home entrypoint
+------------------------------
+
+The upstream init phase remaps the `hermeswebui` account to `WANTED_UID` and
+recursively `chown`s its home. When the existing Hermes home is root-owned,
+remapping to UID 0 creates a second root account and re-enters the root init
+branch after `su`.
+
+`templates/root-entrypoint.sh.j2` patches out **only** that ownership-remap
+branch and runs the rest of the upstream entrypoint unchanged, so path
+validation, venv preparation and Agent source staging still happen. The patch
+asserts its marker matches exactly once and refuses to start otherwise — a
+future upstream image that restructures its init fails loudly instead of
+silently running with the wrong ownership semantics.
 
 Layout
 ------
 
-- All configuration lives in `templates/.env.j2`, templated to
-  `{{ service_dir }}/.env` (mode `0600`, templated with `no_log` so the
-  password never reaches Ansible output/logs). Values come from
-  `defaults/main/main.yml` (non-secret) and `vars/main/vault.yml`
-  (secrets, resolved through `hermes_webui_password`).
-- `docker-compose.yml` reads those values through Compose interpolation
-  (`${hermes_webui_password}`, `${hermes_webui_domain}`, ...) — the same split
-  used by `docmost_setup`.
-- The `hermes-webui` service is attached only to the external `web_net`
-  network. Traefik routes `https://hermes.<main_domain>` to the container port
-  `8787` through labels; no host port is published.
-- Existing Hermes data is mounted read-write because normal WebUI chat and
-  session operations use the same Agent state as the CLI. The role does not
-  create, migrate, `chown`, or `chmod` that directory.
-- WebUI-owned JSON sessions, settings, projects, and attachments live in the
-  separate `{{ service_dir }}/state` mount rather than
-  `/root/.hermes/webui`.
-- The role uses `rsync` to create a filtered export of the installed Agent
-  source, excluding its host virtualenv, Node modules, Git metadata, bytecode,
-  and build artifacts. The export is mounted read-only at `/opt/hermes`. This
-  gives the container the exact Agent implementation used by the host without
-  copying roughly 2 GB of unrelated host artifacts at container startup.
-- `HERMES_WEBUI_AGENT_DIR=/opt/hermes` explicitly selects that read-only
-  source. This is required because WebUI's runtime discovery does not infer the
-  Agent directory from the dependency installation step.
+- Scalar settings live in `templates/.env.j2` → `{{ service_dir }}/.env`
+  (mode `0600`, rendered with `no_log`), and reach Compose through
+  `${…}` interpolation — the same split used by `docmost_setup`.
+- Structure and the mount list come from `templates/docker-compose.yml.j2`,
+  so secrets never enter the Compose file.
+- The rendered project is validated with `docker compose config --quiet`
+  **before** deploy, so a bad template cannot take the running service down.
+- A container recreate is forced only when something that matters actually
+  changed: the Agent source export, the image, the entrypoint, `.env`, or the
+  Compose file. A no-op run is `changed=0`.
 
-Secrets (vault)
----------------
-
-Secrets live in `vars/main/vault.yml`, encrypted with `ansible-vault`. This is
-deliberately under `vars/` rather than `defaults/`: role vars take precedence
-over inventory/group_vars, so the vaulted value can't be silently overridden
-or left blank by an unrelated group_vars/host_vars entry the way a `defaults/`
-value could.
-
-    ansible-vault edit vars/main/vault.yml
-
-| Variable | Description |
-|---|---|
-| `vault_hermes_webui_password` | Password required to log in to the WebUI. Mandatory because the service is publicly reachable through Traefik. Exposed to the rest of the role as `hermes_webui_password` (see `defaults/main/main.yml`). |
-
-Existing Hermes home safety
----------------------------
-
-This role is intentionally for an existing official Hermes installation. It
-fails before deployment unless all of these paths exist:
-
-- `/root/.hermes/config.yaml`
-- `/root/.hermes/state.db`
-- `/usr/local/lib/hermes-agent/pyproject.toml`
-- `/usr/local/lib/hermes-agent/run_agent.py`
-
-For a root-owned home, the upstream image's normal UID-remapping phase cannot
-be used safely: it recursively changes ownership and attempts to turn its
-runtime account into UID 0. The role mounts a small guarded entrypoint that
-skips only that phase, validates the upstream marker before doing so, and then
-runs the rest of the official startup script. `HERMES_SKIP_CHMOD=1` prevents
-the WebUI permission fixer from changing `.env`, `auth.json`, and other CLI
-credential modes.
-
-The existing host gateway may remain running. The WebUI container does not
-start a second gateway daemon; it runs WebUI chat turns in-process and reads
-CLI sessions through Hermes' SQLite state store. Do not separately add a
-`hermes gateway run` command to this Compose service.
-
-Back up `/root/.hermes` before the first deployment. A backup protects against
-application-level changes made intentionally from the WebUI, but it is not a
-substitute for the ownership and path preflight checks above.
-
-The Agent home remains read-write by design. This is required for full WebUI
-chat, resume, profile, memory, and task functionality. If a strictly read-only
-viewer is required, do not deploy this role against the live home; use a
-consistent SQLite backup in an isolated Hermes home instead.
-
-Dependencies
-------------
-
-- `docker_setup` (Docker must be installed on the target host)
-- `traefik_setup` (provides the `web_net` network and the TLS certresolver)
-
-Example Playbook
-----------------
-
-See `playbooks/hermes.yml`:
-
-    - hosts: all
-      become: true
-      gather_facts: true
-      roles:
-        - hermes_webui_setup
-
-Tags
-----
-
-- `install_hermes_webui`, `setup_hermes_webui` — run the whole role
-- `preparing` — create networks, service directory, data dirs, compose + env files
-- `pull` — pull the Docker image
-- `deploy` — start the stack and wait for Hermes WebUI to answer health checks
-
-License
+Traefik
 -------
 
-MIT
-
-Author Information
-------------------
-
-https://github.com/amati-sh
+`traefik_setup` configures the HTTP→HTTPS redirect globally at the entrypoint
+(`--entryPoints.web.http.redirections.*`), so the `http-hermes-webui` router
+here only needs to exist on the `web` entrypoint — matching the other roles in
+this repo. TLS is issued by the `myproduction` resolver.

@@ -1,0 +1,46 @@
+---
+# Internal constants — paths fixed by the upstream image, not user-tunable.
+# Overriding these will not change where the image actually looks.
+
+# Upstream runtime account and its home, as baked into the image.
+hermes_webui_container_user: "hermeswebui"
+hermes_webui_container_user_home: "/home/hermeswebui"
+
+# Mount points inside the container.
+hermes_webui_container_hermes_home: "/home/hermeswebui/.hermes"
+hermes_webui_container_agent_dir: "/opt/hermes"
+hermes_webui_container_state_dir: "/var/lib/hermes-webui"
+hermes_webui_container_entrypoint: "/opt/hermes-webui/root-entrypoint.sh"
+
+# Files rendered onto the host.
+hermes_webui_compose_path: "{{ service_dir }}/docker-compose.yml"
+hermes_webui_env_path: "{{ service_dir }}/.env"
+hermes_webui_entrypoint_path: "{{ service_dir }}/root-entrypoint.sh"
+
+# Build artefacts and caches excluded from the Agent source export.
+hermes_webui_agent_export_excludes:
+  - ".git/"
+  - "venv/"
+  - ".venv/"
+  - "node_modules/"
+  - "__pycache__/"
+  - "*.pyc"
+  - "*.egg-info/"
+  - ".playwright/"
+  - ".pytest_cache/"
+  - ".mypy_cache/"
+  - ".ruff_cache/"
+
+# "LC_ALL=C.UTF-8 LANG=C.UTF-8" — the prefix every remote command needs, built
+# from hermes_webui_host_executor_env so there is one place to change it.
+hermes_webui_host_executor_env_prefix: >-
+  {% for key, value in hermes_webui_host_executor_env.items() %}{{ key }}={{ value }} {% endfor %}
+
+# Fully-qualified reference of the image the container runs. A digest pin wins
+# over the tag when both are set.
+hermes_webui_effective_image: >-
+  {{
+    hermes_webui_image_repository ~ '@' ~ hermes_webui_image_digest
+    if hermes_webui_image_digest | length > 0
+    else hermes_webui_image_repository ~ ':' ~ hermes_webui_image_tag
+  }}

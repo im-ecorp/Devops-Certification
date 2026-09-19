@@ -1,4 +1,5 @@
 #!/bin/bash
+# {{ ansible_managed }}
 set -euo pipefail
 
 # The upstream image's init phase remaps "hermeswebui" to WANTED_UID and then
@@ -7,8 +8,18 @@ set -euo pipefail
 # root-owned Hermes installation, skip only that ownership-remap branch. The
 # remainder of the upstream entrypoint still validates paths, prepares its
 # venv, stages the read-only Agent source, and starts the server.
+#
+# The patch is asserted to match exactly once, so a future upstream image that
+# restructures its init fails loudly here instead of silently running with the
+# wrong ownership semantics.
 upstream_entrypoint=/hermeswebui_init.bash
 patched_entrypoint=/tmp/hermeswebui_init-root-home.bash
+
+if [ ! -r "${upstream_entrypoint}" ]; then
+    echo "hermes-webui: upstream entrypoint ${upstream_entrypoint} is missing;" \
+         "the image layout changed. Refusing to start." >&2
+    exit 1
+fi
 
 python3 - "${upstream_entrypoint}" "${patched_entrypoint}" <<'PY'
 import pathlib
