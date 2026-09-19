@@ -10,7 +10,7 @@
   tags:
     - docker_cleanup
 
-- name: Update Kubernetes tools
-  import_tasks: k8s-tools.yml
-  tags:
-    - k8s_tools
+# - name: Update Kubernetes tools
+#   import_tasks: k8s-tools.yml
+#   tags:
+#     - k8s_tools

@@ -1,50 +1,103 @@
 ---
 # --- DEBIAN / UBUNTU ---
-- name: Update apt cache and upgrade packages
-  ansible.builtin.apt:
-    upgrade: safe
-    update_cache: true
+- name: Update Debian-family hosts
   when: ansible_facts["os_family"] == 'Debian'
-  tags:
-    - update_os
+  block:
+    - name: Update apt cache and upgrade packages
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: "{{ maintenance_apt_cache_valid_time }}"
+        upgrade: "{{ maintenance_apt_upgrade }}"
+        lock_timeout: "{{ maintenance_pkg_lock_timeout }}"
+
+    - name: Remove unused APT dependencies
+      ansible.builtin.apt:
+        autoremove: true
+        autoclean: true
+        lock_timeout: "{{ maintenance_pkg_lock_timeout }}"
+      when: maintenance_autoremove | bool
+      tags:
+        - cleanup
+
+    - name: Check for the reboot-required flag
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: maintenance_reboot_flag
+      tags:
+        - reboot_check
+
+    - name: Record reboot status
+      ansible.builtin.set_fact:
+        maintenance_reboot_needed: "{{ maintenance_reboot_flag.stat.exists }}"
+      tags:
+        - reboot_check
 
 # --- REDHAT / ALMALINUX / ROCKY ---
-- name: Update DNF/YUM cache and upgrade packages
-  ansible.builtin.dnf:
-    name: "*"
-    state: latest
-    update_cache: true
+- name: Update RedHat-family hosts
   when: ansible_facts["os_family"] == 'RedHat'
-  tags:
-    - update_os
+  block:
+    - name: Update DNF cache and upgrade packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+        update_only: true
+        lock_timeout: "{{ maintenance_pkg_lock_timeout }}"
 
-# --- CLEANUP ---
-- name: Remove unused APT dependencies
-  ansible.builtin.apt:
-    autoremove: true
-    autoclean: true
-  when: ansible_facts["os_family"] == 'Debian'
-  tags:
-    - cleanup
+    - name: Remove unused DNF dependencies
+      ansible.builtin.dnf:
+        autoremove: true
+        lock_timeout: "{{ maintenance_pkg_lock_timeout }}"
+      when: maintenance_autoremove | bool
+      tags:
+        - cleanup
 
-- name: Remove unused DNF/YUM dependencies
-  ansible.builtin.dnf:
-    autoremove: true
-  when: ansible_facts["os_family"] == 'RedHat'
-  tags:
-    - cleanup
+    # RedHat has no reboot-required flag file; `dnf needs-restarting -r`
+    # (from dnf-plugins-core) exits 1 when a reboot is needed.
+    - name: Ensure dnf-plugins-core is installed
+      ansible.builtin.dnf:
+        name: dnf-plugins-core
+        state: present
+        lock_timeout: "{{ maintenance_pkg_lock_timeout }}"
+      tags:
+        - reboot_check
 
-# --- REBOOT CHECK ---
-- name: Check if a reboot is required
-  ansible.builtin.stat:
-    path: /var/run/reboot-required
-  register: reboot_required_file
-  tags:
-    - reboot_check
+    - name: Check if a reboot is required
+      ansible.builtin.command: dnf needs-restarting -r
+      register: maintenance_needs_restarting
+      changed_when: false
+      failed_when: maintenance_needs_restarting.rc not in [0, 1]
+      check_mode: false
+      tags:
+        - reboot_check
 
+    - name: Record reboot status
+      ansible.builtin.set_fact:
+        maintenance_reboot_needed: "{{ maintenance_needs_restarting.rc == 1 }}"
+      tags:
+        - reboot_check
+
+- name: Warn about unsupported OS family
+  ansible.builtin.debug:
+    msg: "Skipped OS update on {{ inventory_hostname }}: unsupported OS family {{ ansible_facts['os_family'] }}"
+  when: ansible_facts["os_family"] not in ['Debian', 'RedHat']
+
+# --- REBOOT ---
 - name: Warn if a reboot is required
   ansible.builtin.debug:
     msg: "Server {{ inventory_hostname }} requires a reboot!"
-  when: reboot_required_file.stat.exists
+  when:
+    - maintenance_reboot_needed | default(false) | bool
+    - not maintenance_reboot_if_required | bool
+  tags:
+    - reboot_check
+
+- name: Reboot the server when required
+  ansible.builtin.reboot:
+    msg: "Reboot initiated by Ansible after package updates"
+    reboot_timeout: 600
+  when:
+    - maintenance_reboot_needed | default(false) | bool
+    - maintenance_reboot_if_required | bool
   tags:
     - reboot_check

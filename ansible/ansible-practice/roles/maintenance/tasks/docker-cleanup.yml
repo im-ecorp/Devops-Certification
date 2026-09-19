@@ -1,4 +1,11 @@
 ---
+# The maintenance playbook targets all hosts; skip those without Docker
+# instead of failing on a missing daemon socket.
+- name: Check for the Docker daemon socket
+  ansible.builtin.stat:
+    path: /var/run/docker.sock
+  register: maintenance_docker_socket
+
 - name: Prune unused Docker resources
   community.docker.docker_prune:
     containers: true
@@ -7,5 +14,4 @@
       dangling: false
     networks: true
     builder_cache: true
-  tags:
-    - docker_cleanup
+  when: maintenance_docker_socket.stat.exists

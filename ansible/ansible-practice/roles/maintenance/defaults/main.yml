@@ -1,0 +1,19 @@
+---
+# --- OS updates ---
+# apt upgrade mode: safe (never removes packages), full/dist (may add/remove
+# packages to resolve dependencies), or yes (plain apt-get upgrade).
+maintenance_apt_upgrade: safe
+
+# Skip `apt-get update` if the cache is younger than this (seconds).
+maintenance_apt_cache_valid_time: 3600
+
+# Seconds to wait for another package manager (e.g. unattended-upgrades)
+# to release its lock before failing.
+maintenance_pkg_lock_timeout: 300
+
+# Remove orphaned dependencies and stale package files after upgrading.
+maintenance_autoremove: true
+
+# Reboot automatically when the OS reports one is needed. Off by default;
+# use playbooks/reboot.yml for controlled, serialized reboots.
+maintenance_reboot_if_required: false
