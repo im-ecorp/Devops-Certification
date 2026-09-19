@@ -31,6 +31,20 @@
     label: "{{ item.path | default(item) }}"
   when: hermes_webui_verify_agent_toolchain | bool
 
+- name: Verify the whole host filesystem is reachable inside the container
+  community.docker.docker_container_exec:
+    container: hermes-webui
+    argv:
+      - /bin/sh
+      - "-c"
+      - "test -r {{ hermes_webui_host_root_mount_point }}/etc/hostname && test -d {{ hermes_webui_host_root_mount_point }}/var"
+  register: hermes_webui_host_root_check
+  changed_when: false
+  failed_when: hermes_webui_host_root_check.rc != 0
+  when:
+    - hermes_webui_verify_agent_toolchain | bool
+    - hermes_webui_host_root_enabled | bool
+
 - name: Verify the bundled hermes CLI resolves on the container PATH
   community.docker.docker_container_exec:
     container: hermes-webui
@@ -106,6 +120,7 @@
       Image:            {{ hermes_webui_effective_image | trim }}
       Runtime home:     {{ hermes_webui_container_home }} (root-owned: {{ hermes_webui_root_owned_home }})
       SSH passthrough:  {{ 'yes (' ~ hermes_webui_ssh_dir ~ ', read-only)' if hermes_webui_ssh_enabled | bool else 'no' }}
+      Whole host FS:    {{ hermes_webui_host_root_path ~ ' -> ' ~ hermes_webui_host_root_mount_point ~ (' (read-only)' if hermes_webui_host_root_read_only | bool else ' (read-write)') if hermes_webui_host_root_enabled | bool else 'disabled' }}
       Host executor:    {{ hermes_webui_host_alias ~ ':' ~ hermes_webui_host_ssh_port if hermes_webui_host_executor_enabled | bool else 'disabled' }}
       Agent workspaces:
       {% for workspace in hermes_webui_workspaces %}

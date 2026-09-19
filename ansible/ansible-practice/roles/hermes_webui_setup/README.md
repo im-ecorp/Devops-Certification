@@ -28,8 +28,41 @@ three after deploying**:
 | The agent needs | How it gets it |
 |---|---|
 | Your repositories | `hermes_webui_workspaces`, bind-mounted at their **host paths** |
+| The rest of the server | `hermes_webui_host_root_*` — the whole host filesystem at `/host` |
 | The `hermes` CLI | Already in the image at `/app/venv/bin`; put on `PATH` via `hermes_webui_container_path` |
 | Ansible | Not in the image. The agent SSHes back to the host and runs it there — see below |
+
+Three ways to reach the server
+------------------------------
+
+They are not redundant; each solves a different problem.
+
+1. **Path-identical workspaces** — `hermes_webui_workspaces`, default `/root`.
+   A path typed in the UI resolves to the same file the host sees, so
+   `/root/mygit/...` just works. Use this for the directories you actually
+   work in.
+
+2. **`/host` — the whole filesystem.** `hermes_webui_host_root_enabled` mounts
+   the host's `/` read-write at `/host`, so the host's `/etc/nginx` is
+   `/host/etc/nginx` and `/var/log` is `/host/var/log`. Paths are prefixed,
+   which is the price of not shadowing the container's own OS. The prefix is
+   in the container environment as `HERMES_HOST_FS`.
+
+3. **The host executor** — for *doing* rather than reading. `systemctl`,
+   `docker`, `apt` and `ansible` have to run on the host, not in the
+   container. See the next section.
+
+### Why not just mount everything at its real path?
+
+Because the container needs its own `/etc`, `/var`, `/usr`, `/bin`, `/lib`,
+`/sbin`, `/proc`, `/sys`, `/dev`, `/run` and `/tmp` to function — mounting the
+host's over them replaces the OS the WebUI is running on, and the failure looks
+like a corrupt image. `hermes_webui_workspace_forbidden_paths` makes preflight
+reject that with an explanation rather than letting you find out at runtime.
+
+`/root` is safe to shadow, and is the default, because the container's own
+`/root` holds nothing but a uv cache. The read-only `/root/.ssh` mount nests
+on top of the read-write `/root`, so the keys stay read-only either way.
 
 Running Ansible from the WebUI
 ------------------------------
@@ -65,14 +98,27 @@ rediscover them:
 - **`UserKnownHostsFile=/dev/null`.** `~/.ssh` is mounted read-only, so `ssh`
   cannot record the host key and would warn on every single invocation.
 
-> **Security.** Mounting `hermes_webui_ssh_dir` gives every authenticated WebUI
-> session the ability to log in wherever those keys are authorised — including
-> back into this host as root. The service is published on the public internet
-> behind one password. Keep `vault_hermes_webui_password` strong (preflight
-> enforces `hermes_webui_password_min_length`), put the service behind Authelia
-> if available, or point `hermes_webui_ssh_dir` at a dedicated, narrowly
-> authorised key directory. Set `hermes_webui_ssh_enabled: false` to drop this
-> capability entirely.
+> **Security — read this before widening access.** With the defaults, an
+> authenticated WebUI session is equivalent to root on this machine: it can
+> read and write the entire filesystem at `/host`, holds `/root` read-write
+> (including `~/.claude.json`, `.gnupg`, `.kube`, `.env` and every other
+> credential kept there), and can SSH as root to this host and anywhere else
+> those keys are authorised. The service is published on the public internet
+> behind a single password.
+>
+> That is the access the role was asked for, and it is a deliberate choice, not
+> an accident — but size the protection to match it:
+>
+> - Keep `vault_hermes_webui_password` strong; preflight enforces
+>   `hermes_webui_password_min_length`.
+> - Put the service behind Authelia (`authelia_setup`) if it is reachable from
+>   the internet.
+> - Pin `hermes_webui_image_digest`. An unpinned tag means a future `docker
+>   pull` can change the code that holds all of this.
+> - To narrow it: `hermes_webui_host_root_read_only: true` (read the server,
+>   write only the workspaces), `hermes_webui_ssh_enabled: false` (no SSH
+>   capability), or point `hermes_webui_ssh_dir` at a dedicated, narrowly
+>   authorised key directory.
 
 Requirements
 ------------
@@ -143,8 +189,13 @@ docker image inspect ghcr.io/nesquena/hermes-webui:latest --format '{{index .Rep
 
 | Variable | Default | Description |
 |---|---|---|
-| `hermes_webui_workspaces` | `[{path: /root/mygit}]` | Host dirs mounted at the **same absolute path** in the container. String or `{path, read_only}` |
+| `hermes_webui_workspaces` | `[{path: /root}]` | Host dirs mounted at the **same absolute path** in the container. String or `{path, read_only}` |
 | `hermes_webui_workspaces_must_exist` | `true` | Fail if a declared workspace is missing, instead of letting Docker mount an empty dir over it |
+| `hermes_webui_workspace_forbidden_paths` | `/etc`, `/var`, `/usr`, … | Paths preflight refuses as workspaces, because shadowing them breaks the container |
+| `hermes_webui_host_root_enabled` | `true` | Mount the whole host filesystem, so the agent can reach the entire server |
+| `hermes_webui_host_root_path` | `/` | What to mount |
+| `hermes_webui_host_root_mount_point` | `/host` | Where it appears in the container; exported as `HERMES_HOST_FS` |
+| `hermes_webui_host_root_read_only` | `false` | Set `true` to let the agent read the whole server but change only its workspaces |
 | `hermes_webui_host_executor_enabled` | `true` | Publish the host as `host.docker.internal` so the agent can run Ansible there |
 | `hermes_webui_host_alias` | `host.docker.internal` | Name the host is published under |
 | `hermes_webui_host_ssh_port` | `{{ ansible_port \| default(22) }}` | Host sshd port as reachable from the container |

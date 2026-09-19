@@ -32,6 +32,11 @@ services:
       HERMES_WEBUI_TRUST_FORWARDED_FOR: ${hermes_webui_trust_forwarded_for}
       HERMES_WEBUI_TRUST_FORWARDED_PROTO: ${hermes_webui_trust_forwarded_proto}
       HERMES_SKIP_CHMOD: ${hermes_webui_skip_chmod}
+{% if hermes_webui_host_root_enabled | bool %}
+      # Prefix where the whole host filesystem is readable, e.g. the host's
+      # /etc/nginx is {{ hermes_webui_host_root_mount_point }}/etc/nginx.
+      HERMES_HOST_FS: "{{ hermes_webui_host_root_mount_point }}"
+{% endif %}
 {% if hermes_webui_root_owned_home | bool %}
       HERMES_WEBUI_ROOT_HOME_MODE: 1
 {% endif %}
@@ -67,6 +72,11 @@ services:
 {% set workspace_path = workspace.path | default(workspace) %}
       - "{{ workspace_path }}:{{ workspace_path }}{{ ':ro' if workspace.read_only | default(false) else '' }}"
 {% endfor %}
+{% endif %}
+{% if hermes_webui_host_root_enabled | bool %}
+      # The whole host filesystem under a single prefix, so the agent can reach
+      # /etc, /var and everything else without shadowing the container's own OS.
+      - "{{ hermes_webui_host_root_path }}:{{ hermes_webui_host_root_mount_point }}{{ ':ro' if hermes_webui_host_root_read_only | bool else '' }}"
 {% endif %}
 {% if hermes_webui_ssh_enabled | bool %}
       # Read-only SSH material so Ansible run from the WebUI can reach the

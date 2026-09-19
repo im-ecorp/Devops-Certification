@@ -47,13 +47,54 @@ hermes_webui_state_dir: "{{ service_dir }}/state"
 #
 # Without this, the agent answers "the path /root/mygit is absent" — it is
 # reporting its own filesystem accurately.
+#
+# /root covers every project directory on this host with matching paths. Only
+# add top-level directories here that are safe to shadow: mounting /etc, /var,
+# /usr, /bin, /lib, /sbin, /proc, /sys, /dev, /run or /tmp over the container's
+# own would replace the OS the WebUI is running on. Reach those through
+# hermes_webui_host_root_mount_point or the host executor instead.
 hermes_webui_workspaces:
-  - path: "/root/mygit"
+  - path: "/root"
     read_only: false
 
 # Require every declared workspace to exist on the host before deploying,
 # rather than letting Docker create an empty directory in its place.
 hermes_webui_workspaces_must_exist: true
+
+# Top-level container directories that must never be used as a path-identical
+# workspace, because shadowing them breaks the container's own filesystem.
+hermes_webui_workspace_forbidden_paths:
+  - "/"
+  - "/bin"
+  - "/boot"
+  - "/dev"
+  - "/etc"
+  - "/lib"
+  - "/lib32"
+  - "/lib64"
+  - "/proc"
+  - "/run"
+  - "/sbin"
+  - "/sys"
+  - "/tmp"
+  - "/usr"
+  - "/var"
+
+# --- Whole-server access ----------------------------------------------------
+
+# Mount the host's entire filesystem, read-write, at a single prefix. This is
+# what gives the agent access to the whole server rather than a few chosen
+# directories: /etc/nginx is readable at /host/etc/nginx, /var/log at
+# /host/var/log, and so on, without shadowing the container's own OS.
+#
+# Paths under here are prefixed, so for directories where the path must match
+# exactly (anything you type as /root/... in the UI) use a workspace above.
+# To *act* on the system — systemctl, docker, apt, ansible — use the host
+# executor, which runs on the host itself with real paths.
+hermes_webui_host_root_enabled: true
+hermes_webui_host_root_path: "/"
+hermes_webui_host_root_mount_point: "/host"
+hermes_webui_host_root_read_only: false
 
 # --- Running Ansible from the WebUI -----------------------------------------
 

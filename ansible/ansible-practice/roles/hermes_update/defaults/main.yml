@@ -1,3 +1,8 @@
 ---
 # Root-mode Hermes Agent launcher installed by the official installer.
 hermes_update_binary: /usr/local/bin/hermes
+
+# Where hermes-gateway.service is installed: system, user, or auto.
+# auto picks system when /etc/systemd/system/hermes-gateway.service exists,
+# otherwise root's systemd --user service (root-mode install).
+hermes_update_gateway_scope: auto

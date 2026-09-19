@@ -120,6 +120,24 @@
 # the agent runs in the container, so an unmounted host path simply is not
 # there. Docker would helpfully create an empty directory and hide the mistake.
 
+# Mounting a host directory over one the container needs for itself replaces
+# the OS the WebUI is running on, and the failure looks like a corrupt image.
+- name: Refuse to shadow the container's own filesystem with a workspace
+  ansible.builtin.assert:
+    that:
+      - (item.path | default(item)) | regex_replace('/$', '')
+        not in hermes_webui_workspace_forbidden_paths
+    fail_msg: >-
+      Agent workspace {{ item.path | default(item) }} would be mounted over the
+      container's own {{ item.path | default(item) }}, replacing the filesystem
+      the WebUI runs on. Reach it at
+      {{ hermes_webui_host_root_mount_point }}{{ item.path | default(item) }}
+      instead, or act on it through the host executor.
+    quiet: true
+  loop: "{{ hermes_webui_workspaces }}"
+  loop_control:
+    label: "{{ item.path | default(item) }}"
+
 - name: Check the declared agent workspaces on the host
   ansible.builtin.stat:
     path: "{{ item.path | default(item) }}"
