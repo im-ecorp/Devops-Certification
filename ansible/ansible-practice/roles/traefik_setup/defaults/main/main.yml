@@ -2,7 +2,7 @@
 # Default variables for Traefik setup
 
 # Docker image tag
-traefik_image_tag: "v3.7.10"
+traefik_image_tag: "v3.7.13"
 
 # Traefik dashboard subdomain
 traefik_domain: "traefik.{{ main_domain }}"
