@@ -2,7 +2,7 @@
 # Default variables for DeepSeek Harness setup
 
 # Package version of @deepseek-ai/dsh
-deepseek_dsh_version: "0.1.5-rc.2"
+deepseek_dsh_version: "latest"
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "unless-stopped"
