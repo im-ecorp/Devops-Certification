@@ -1,0 +1,10 @@
+#!/bin/sh
+# {{ ansible_managed }}
+set -eu
+
+socat TCP-LISTEN:3081,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:3080 &
+
+exec node --expose-internals $(which dsh) web \
+  --no-open \
+  --port 3080 \
+  --trusted-host {{ deepseek_domain }}

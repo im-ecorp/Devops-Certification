@@ -1,0 +1,37 @@
+# {{ ansible_managed }}
+---
+services:
+  deepseek-harness:
+    build:
+      context: .
+      args:
+        DSH_VERSION: "{{ deepseek_dsh_version }}"
+    image: local/deepseek-harness:{{ deepseek_dsh_version }}
+    container_name: deepseek-harness
+    restart: {{ restart_policy }}
+    environment:
+      HOME: /home/node
+      DSH_HOME: /home/node/.dsh
+    volumes:
+      - ./home:/home/node
+      - ./workspace:/workspace
+    networks:
+      - web_net
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3081/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+networks:
+  web_net:
+    name: web_net
+    external: true

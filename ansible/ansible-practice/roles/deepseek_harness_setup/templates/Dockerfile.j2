@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+FROM node:24-bookworm-slim
+
+ARG DSH_VERSION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       bash ca-certificates curl git openssh-client python3 socat \
+    && npm install --global "@deepseek-ai/dsh@${DSH_VERSION}" \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
+
+COPY --chown=node:node entrypoint.sh /usr/local/bin/deepseek-harness-entrypoint
+RUN chmod 0755 /usr/local/bin/deepseek-harness-entrypoint
+
+ENV HOME=/home/node \
+    DSH_HOME=/home/node/.dsh
+WORKDIR /workspace
+USER node
+
+EXPOSE 3081
+ENTRYPOINT ["/usr/local/bin/deepseek-harness-entrypoint"]

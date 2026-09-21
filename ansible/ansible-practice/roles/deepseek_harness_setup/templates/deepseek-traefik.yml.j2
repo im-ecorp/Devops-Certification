@@ -1,0 +1,23 @@
+# {{ ansible_managed }}
+http:
+  routers:
+    deepseek-harness:
+      rule: "Host(`{{ deepseek_domain }}`)"
+      entryPoints:
+        - web-secure
+      service: deepseek-harness
+      middlewares:
+        - web-auth@docker
+      tls:
+        certResolver: myproduction
+
+  services:
+    deepseek-harness:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://deepseek-harness:3081"
+        healthCheck:
+          path: /
+          interval: 30s
+          timeout: 5s

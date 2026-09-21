@@ -1,0 +1,14 @@
+---
+# Default variables for DeepSeek Harness setup
+
+# Package version of @deepseek-ai/dsh
+deepseek_dsh_version: "0.1.5-rc.2"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "unless-stopped"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/deepseek-harness"
+
+# DeepSeek Harness domain
+deepseek_domain: "deepseek.{{ main_domain }}"

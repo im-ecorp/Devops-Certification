@@ -1,0 +1,7 @@
+---
+
+- name: Setup DeepSeek Harness Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_deepseek_harness
+    - setup_deepseek_harness

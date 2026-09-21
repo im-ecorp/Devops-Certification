@@ -1,0 +1,70 @@
+---
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Create persistent data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: "0755"
+  loop:
+    - "{{ service_dir }}/home"
+    - "{{ service_dir }}/workspace"
+  tags:
+    - preparing
+
+- name: Template Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ service_dir }}/Dockerfile"
+    mode: "0644"
+  tags:
+    - preparing
+
+- name: Template entrypoint script
+  ansible.builtin.template:
+    src: entrypoint.sh.j2
+    dest: "{{ service_dir }}/entrypoint.sh"
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+  tags:
+    - preparing
+
+- name: Template Traefik dynamic configuration
+  ansible.builtin.template:
+    src: deepseek-traefik.yml.j2
+    dest: "{{ project_dir }}/traefik/dynamic/deepseek.yml"
+    mode: "0644"
+  tags:
+    - preparing
+
+- name: Pull base images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    state: present
+    build: always
+  register: compose_deploy
+  tags:
+    - deploy

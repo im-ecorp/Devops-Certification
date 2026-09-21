@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure DeepSeek Harness service
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+    - deepseek_harness_setup
