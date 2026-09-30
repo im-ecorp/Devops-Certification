@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure mail server
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - mailserver_setup

@@ -1,0 +1,13 @@
+---
+
+- name: Setup Mailserver Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_mailserver
+    - setup_mailserver
+
+- name: Setup Mailserver Service | DKIM
+  ansible.builtin.import_tasks: dkim.yml
+  tags:
+    - setup_mailserver
+    - dkim_mailserver

@@ -1,0 +1,48 @@
+---
+
+- name: Check for existing DKIM key
+  ansible.builtin.stat:
+    path: "{{ service_dir }}/config/rspamd/dkim/rsa-{{ mailserver_dkim_key_size }}-{{ mailserver_dkim_selector }}-{{ mailserver_domain }}.public.dns.txt"
+  register: mailserver_dkim_record
+  tags:
+    - deploy
+
+- name: Generate DKIM key
+  community.docker.docker_container_exec:
+    container: mailserver
+    argv:
+      - setup
+      - config
+      - dkim
+      - keysize
+      - "{{ mailserver_dkim_key_size | string }}"
+      - selector
+      - "{{ mailserver_dkim_selector }}"
+      - domain
+      - "{{ mailserver_domain }}"
+  when: not mailserver_dkim_record.stat.exists
+  notify: Restart Mailserver
+  tags:
+    - deploy
+
+- name: Read DKIM DNS record
+  ansible.builtin.slurp:
+    src: "{{ service_dir }}/config/rspamd/dkim/rsa-{{ mailserver_dkim_key_size }}-{{ mailserver_dkim_selector }}-{{ mailserver_domain }}.public.dns.txt"
+  register: mailserver_dkim_record_content
+  tags:
+    - deploy
+    - dns
+
+- name: Show required DNS records
+  ansible.builtin.debug:
+    msg:
+      - "A     {{ mailserver_hostname }}  ->  {{ ansible_host | default(inventory_hostname) }}"
+      - "MX    {{ mailserver_domain }}  ->  10 {{ mailserver_hostname }}"
+      - "TXT   {{ mailserver_domain }}  ->  v=spf1 mx -all"
+      - "TXT   _dmarc.{{ mailserver_domain }}  ->  v=DMARC1; p=quarantine; rua=mailto:{{ mailserver_postmaster_address }}"
+      - "TXT   {{ mailserver_dkim_selector }}._domainkey.{{ mailserver_domain }}  ->  {{ mailserver_dkim_record_content.content | b64decode | trim }}"
+      - "PTR   {{ ansible_host | default(inventory_hostname) }}  ->  {{ mailserver_hostname }}  (set at your hosting provider)"
+      - "{{ 'Webmail  https://' ~ mailserver_hostname ~ '/' if mailserver_webmail_enabled | bool else 'Webmail  disabled (mailserver_webmail_enabled: false)' }}"
+  tags:
+    - deploy
+    - dns

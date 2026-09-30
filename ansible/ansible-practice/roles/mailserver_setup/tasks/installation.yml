@@ -1,0 +1,193 @@
+---
+
+- name: Validate Mailserver variables
+  ansible.builtin.assert:
+    that:
+      - mailserver_accounts | length > 0
+      - mailserver_accounts | map(attribute='password') | select | list | length == mailserver_accounts | length
+    fail_msg: >-
+      Every entry in mailserver_accounts needs a password (set it in
+      defaults/main/vault.yml).
+    quiet: true
+  tags:
+    - preparing
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+  tags:
+    - preparing
+
+# Debian ships exim4 listening on localhost:25, which stops Docker from publishing port 25.
+- name: Stop host mail services that hold the SMTP port
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ mailserver_host_mta_services }}"
+  # systemd also lists units it only knows by name (status not-found); skip those
+  when: ansible_facts.services[item ~ '.service'].status | default('not-found') != 'not-found'
+  tags:
+    - preparing
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ service_dir }}"
+    - "{{ service_dir }}/config"
+  tags:
+    - preparing
+
+- name: Read Traefik certificate volume
+  community.docker.docker_volume_info:
+    name: "{{ mailserver_traefik_volume }}"
+  register: mailserver_traefik_volume_info
+  tags:
+    - preparing
+    - deploy
+
+- name: Ensure Traefik is deployed
+  ansible.builtin.assert:
+    that:
+      - mailserver_traefik_volume_info.exists
+    fail_msg: >-
+      Docker volume '{{ mailserver_traefik_volume }}' not found. Deploy Traefik
+      (playbooks/traefik.yml) first; the mailserver takes its certificate from it.
+    quiet: true
+  tags:
+    - preparing
+    - deploy
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: Restart Mailserver
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+  notify: Restart Mailserver
+  tags:
+    - preparing
+
+# The mailserver watches these files and reloads by itself, so no restart is notified.
+- name: Template mail accounts file
+  ansible.builtin.template:
+    src: postfix-accounts.cf.j2
+    dest: "{{ service_dir }}/config/postfix-accounts.cf"
+    mode: "0600"
+  no_log: true
+  tags:
+    - preparing
+    - accounts
+
+- name: Template mail aliases file
+  ansible.builtin.template:
+    src: postfix-virtual.cf.j2
+    dest: "{{ service_dir }}/config/postfix-virtual.cf"
+    mode: "0644"
+  tags:
+    - preparing
+    - accounts
+
+- name: Template Fail2Ban exception for webmail
+  ansible.builtin.template:
+    src: fail2ban-jail.cf.j2
+    dest: "{{ service_dir }}/config/fail2ban-jail.cf"
+    mode: "0644"
+  when: mailserver_webmail_enabled | bool
+  notify: Restart Mailserver
+  tags:
+    - preparing
+
+- name: Remove Fail2Ban exception without webmail
+  ansible.builtin.file:
+    path: "{{ service_dir }}/config/fail2ban-jail.cf"
+    state: absent
+  when: not mailserver_webmail_enabled | bool
+  notify: Restart Mailserver
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  tags:
+    - pull
+
+# The mailserver refuses to start without its certificate, so Traefik has to
+# issue it before the mail container is started. The router lives on the
+# webmail container, or on a small placeholder when webmail is off.
+- name: Deploy certificate router
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    services:
+      - "{{ 'webmail' if mailserver_webmail_enabled | bool else 'mailserver-cert' }}"
+    remove_orphans: true
+  tags:
+    - deploy
+
+- name: Wait for Traefik to issue the certificate
+  ansible.builtin.wait_for:
+    path: "{{ mailserver_traefik_volume_info.volume.Mountpoint }}/acme.json"
+    search_regex: '"{{ mailserver_hostname | regex_escape }}"'
+    timeout: "{{ mailserver_cert_timeout }}"
+    msg: >-
+      Traefik has not issued a certificate for {{ mailserver_hostname }}. Check that
+      its DNS A record points to this server and that port 443 is reachable.
+  tags:
+    - deploy
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    remove_orphans: true
+  register: compose_deploy
+  tags:
+    - deploy
+
+- name: Wait for Mailserver container to be healthy
+  community.docker.docker_container_info:
+    name: mailserver
+  register: mailserver_container
+  until: mailserver_container.container.State.Health.Status == "healthy"
+  retries: 30
+  delay: 10
+  tags:
+    - deploy
+
+- name: Wait for Webmail to be available
+  ansible.builtin.uri:
+    url: "https://{{ mailserver_hostname }}/"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: mailserver_webmail_health
+  until: mailserver_webmail_health.status == 200
+  retries: 30
+  delay: 10
+  when: mailserver_webmail_enabled | bool
+  tags:
+    - deploy

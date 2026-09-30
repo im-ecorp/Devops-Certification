@@ -1,0 +1,80 @@
+---
+# Default variables for Mailserver setup
+#
+# The stack is the one the docker-mailserver docs recommend for a small server:
+# Rspamd (spam filter, DKIM, DMARC, SPF) + Fail2Ban, IMAP only, no ClamAV.
+
+# Docker image versions
+mailserver_image_tag: "16.0.1"
+mailserver_whoami_image_tag: "v1.12.0"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "always"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/mailserver"
+
+# Mail domain (the part after @) and the server FQDN (MX target and TLS certificate name)
+# Mail uses the apex domain, not main_domain (w.k8sforfun.com) that the other services use
+mailserver_domain: "k8sforfun.com"
+mailserver_hostname: "mail.{{ mailserver_domain }}"
+
+# Address that receives bounces and system reports
+mailserver_postmaster_address: "postmaster@{{ mailserver_domain }}"
+
+# Container timezone
+mailserver_timezone: "Asia/Tehran"
+
+# Published mail ports (host:container); mail traffic does not pass through Traefik
+mailserver_ports:
+  - "25:25"     # SMTP, inbound mail from other servers
+  - "465:465"   # SMTPS, client submission with implicit TLS
+  - "587:587"   # Submission, client submission with STARTTLS
+  - "993:993"   # IMAPS
+
+# Host mail services stopped and disabled so the container can bind port 25
+mailserver_host_mta_services:
+  - exim4
+  - postfix
+
+# TLS comes from Traefik: this volume holds acme.json (mounted read-only)
+mailserver_traefik_volume: "traefik_data"
+
+# Seconds to wait for Traefik to issue the certificate on first deploy
+mailserver_cert_timeout: 300
+
+# Maximum message size in bytes (25 MB)
+mailserver_message_size_limit: 26214400
+
+# Container memory limit
+mailserver_memory_limit: "1g"
+
+# Roundcube webmail at https://<mailserver_hostname> (false keeps mail apps only)
+mailserver_webmail_enabled: true
+mailserver_webmail_image_tag: "1.7.4-apache"
+mailserver_webmail_memory_limit: "256m"
+
+# Private network between webmail and mailserver; the webmail IP is exempt from
+# Fail2Ban so a user's wrong passwords cannot ban webmail for everyone
+mailserver_webmail_subnet: "10.253.25.0/28"
+mailserver_webmail_ip: "10.253.25.10"
+
+# DKIM key generated on first deploy
+mailserver_dkim_selector: "mail"
+mailserver_dkim_key_size: 2048
+
+# Mailboxes; passwords live in vault.yml
+# Accounts are managed only here; accounts added with `setup email add` are overwritten
+mailserver_accounts:
+  - address: "admin@{{ mailserver_domain }}"
+    password: "{{ mailserver_admin_password }}"
+
+# Aliases (address -> destination)
+mailserver_aliases:
+  - address: "postmaster@{{ mailserver_domain }}"
+    destination: "admin@{{ mailserver_domain }}"
+  - address: "info@{{ mailserver_domain }}"
+    destination: "admin@{{ mailserver_domain }}"
+  - address: "no-reply@{{ mailserver_domain }}"
+    destination: "admin@{{ mailserver_domain }}"
+

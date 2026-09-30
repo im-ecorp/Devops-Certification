@@ -1,0 +1,148 @@
+services:
+
+  # docker-mailserver — Postfix, Dovecot (IMAP), Rspamd and Fail2Ban in one container
+  mailserver:
+    image: mailserver/docker-mailserver:${image_tag}
+    container_name: mailserver
+    hostname: ${mailserver_hostname}
+    restart: ${restart_policy}
+    stop_grace_period: 1m
+    environment:
+      TZ: ${TZ}
+      POSTMASTER_ADDRESS: ${POSTMASTER_ADDRESS}
+      POSTFIX_MESSAGE_SIZE_LIMIT: ${POSTFIX_MESSAGE_SIZE_LIMIT}
+      SPOOF_PROTECTION: ${SPOOF_PROTECTION}
+      SSL_TYPE: ${SSL_TYPE}
+      ENABLE_RSPAMD: ${ENABLE_RSPAMD}
+      ENABLE_OPENDKIM: ${ENABLE_OPENDKIM}
+      ENABLE_OPENDMARC: ${ENABLE_OPENDMARC}
+      ENABLE_POLICYD_SPF: ${ENABLE_POLICYD_SPF}
+      ENABLE_AMAVIS: ${ENABLE_AMAVIS}
+      ENABLE_FAIL2BAN: ${ENABLE_FAIL2BAN}
+    volumes:
+      - mail_data:/var/mail
+      - mail_state:/var/mail-state
+      - mail_logs:/var/log/mail
+      - ${service_dir}/config:/tmp/docker-mailserver
+      # Certificate Traefik issues for the mail hostname; reloaded automatically on renewal
+      - ${acme_json_path}:/etc/letsencrypt/acme.json:ro
+    ports:
+{% for port in mailserver_ports %}
+      - "{{ port }}"
+{% endfor %}
+    # Fail2Ban needs to manage the host's packet filter
+    cap_add:
+      - NET_ADMIN
+    mem_limit: ${mailserver_memory_limit}
+    networks:
+      app_net: {}
+{% if mailserver_webmail_enabled | bool %}
+      # Webmail reaches the mailserver by its public name, so the TLS certificate matches
+      mail_internal:
+        aliases:
+          - ${mailserver_hostname}
+{% endif %}
+    healthcheck:
+      test: ["CMD", "dms-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+{% if mailserver_webmail_enabled | bool %}
+
+  # Roundcube webmail — also carries the Traefik router that issues the mail
+  # hostname's certificate. No depends_on: the role starts it before the
+  # mailserver so Traefik can issue the certificate first.
+  webmail:
+    image: roundcube/roundcubemail:${webmail_image_tag}
+    container_name: mailserver-webmail
+    hostname: mailserver-webmail
+    restart: ${restart_policy}
+    environment:
+      ROUNDCUBEMAIL_DEFAULT_HOST: ${ROUNDCUBEMAIL_DEFAULT_HOST}
+      ROUNDCUBEMAIL_DEFAULT_PORT: ${ROUNDCUBEMAIL_DEFAULT_PORT}
+      ROUNDCUBEMAIL_SMTP_SERVER: ${ROUNDCUBEMAIL_SMTP_SERVER}
+      ROUNDCUBEMAIL_SMTP_PORT: ${ROUNDCUBEMAIL_SMTP_PORT}
+      ROUNDCUBEMAIL_USERNAME_DOMAIN: ${ROUNDCUBEMAIL_USERNAME_DOMAIN}
+      ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE: ${ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE}
+      ROUNDCUBEMAIL_DES_KEY: ${ROUNDCUBEMAIL_DES_KEY}
+      TZ: ${TZ}
+    volumes:
+      - webmail_db:/var/roundcube/db
+    mem_limit: ${webmail_memory_limit}
+    networks:
+      web_net: {}
+      # Fixed address: the only one the mailserver's Fail2Ban never bans
+      mail_internal:
+        ipv4_address: ${mailserver_webmail_ip}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-mail.rule=Host(`${mailserver_hostname}`)"
+      - "traefik.http.routers.http-mail.entrypoints=web"
+      - "traefik.http.routers.http-mail.service=mail"
+      - "traefik.http.routers.mail.rule=Host(`${mailserver_hostname}`)"
+      - "traefik.http.routers.mail.entrypoints=web-secure"
+      - "traefik.http.routers.mail.tls=true"
+      - "traefik.http.routers.mail.tls.certresolver=myproduction"
+      - "traefik.http.routers.mail.service=mail"
+      - "traefik.http.services.mail.loadBalancer.server.port=80"
+{% else %}
+
+  # Certificate router — mail ports bypass Traefik, so this tiny container only
+  # carries the router that makes Traefik issue and renew the mail hostname's
+  # certificate. The image has no shell, so it has no healthcheck.
+  mailserver-cert:
+    image: traefik/whoami:${whoami_image_tag}
+    container_name: mailserver-cert
+    hostname: mailserver-cert
+    restart: ${restart_policy}
+    networks:
+      - web_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-mail.rule=Host(`${mailserver_hostname}`)"
+      - "traefik.http.routers.http-mail.entrypoints=web"
+      - "traefik.http.routers.http-mail.service=mail"
+      - "traefik.http.routers.mail.rule=Host(`${mailserver_hostname}`)"
+      - "traefik.http.routers.mail.entrypoints=web-secure"
+      - "traefik.http.routers.mail.tls=true"
+      - "traefik.http.routers.mail.tls.certresolver=myproduction"
+      - "traefik.http.routers.mail.service=mail"
+      - "traefik.http.services.mail.loadBalancer.server.port=80"
+{% endif %}
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+{% if mailserver_webmail_enabled | bool %}
+  # Private link between webmail and mailserver, with a fixed subnet for the webmail IP
+  mail_internal:
+    name: mailserver_internal
+    ipam:
+      config:
+        - subnet: ${mailserver_webmail_subnet}
+{% endif %}
+
+volumes:
+  mail_data:
+    name: mailserver_data
+  mail_state:
+    name: mailserver_state
+  mail_logs:
+    name: mailserver_logs
+{% if mailserver_webmail_enabled | bool %}
+  webmail_db:
+    name: mailserver_webmail_db
+{% endif %}

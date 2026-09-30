@@ -1,0 +1,3 @@
+{% for account in mailserver_accounts %}
+{{ account.address }}|{SHA512-CRYPT}{{ account.password | password_hash('sha512', (account.address | hash('sha256'))[:16]) }}
+{% endfor %}

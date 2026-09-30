@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Fail2Ban never bans the webmail container: every webmail login reaches the
+# mailserver from its address. Roundcube rate-limits failed logins itself.
+[DEFAULT]
+ignoreip = 127.0.0.1/8 {{ mailserver_webmail_ip }}
