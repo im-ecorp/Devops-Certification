@@ -29,15 +29,6 @@
   tags:
     - preparing
 
-- name: Copy export proxy configuration
-  ansible.builtin.copy:
-    src: nginx-export.conf
-    dest: "{{ service_dir }}/nginx-export.conf"
-    mode: "0644"
-  notify: Restart OmniRoute
-  tags:
-    - preparing
-
 - name: Template environment file
   ansible.builtin.template:
     src: .env.j2
@@ -57,6 +48,21 @@
 - name: Deploy Docker Compose stack
   community.docker.docker_compose_v2:
     project_src: "{{ service_dir }}"
+    # Removes the retired export_proxy sidecar on hosts that still run it
+    remove_orphans: true
   register: compose_deploy
+  tags:
+    - deploy
+
+- name: Wait for OmniRoute to be available
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ omniroute_local_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: result
+  until: result.status == 200
+  retries: 20
+  delay: 10
   tags:
     - deploy

@@ -1,10 +1,10 @@
 ---
 # Default variables for OmniRoute setup
 
-# Docker image tags
-omniroute_image_tag: "latest"
+# Docker image tags (pin a released version; `latest` moves on every upstream
+# release and each recreate drops all in-flight sessions)
+omniroute_image_tag: "3.8.51"
 omniroute_redis_image_tag: "8.10.1-alpine"
-nginx_image_tag: "1.27-alpine"
 
 # Container restart policy (always, on-failure, unless-stopped)
 restart_policy: "unless-stopped"
@@ -17,3 +17,33 @@ omniroute_main_domain: "omniroute.{{ main_domain }}"
 
 # OmniRoute Cloud Sync Endpoint (Option A)
 omniroute_cloud_url: "https://cloud.omniroute.online"
+
+# Port the app listens on inside the container (dashboard + /v1 API)
+omniroute_port: "20128"
+
+# Host port published on 127.0.0.1 only, for SSH-tunnel access to LOCAL_ONLY
+# dashboard features such as "Export All" (ssh -L 20128:127.0.0.1:20128 <host>)
+omniroute_local_port: "20128"
+
+# Require an API key on /v1/* (the domain is public, so keep this true)
+omniroute_require_api_key: "true"
+
+# Send the dashboard session cookie over HTTPS only (Traefik terminates TLS)
+omniroute_auth_cookie_secure: "true"
+
+# Node heap ceiling in MB. 4096 covers the dashboard, normal chat and a coding
+# agent; upstream sheds load with retryable 503s before the heap fills. Raise
+# to 8192 (with a 10g memory limit) for several concurrent long-context agents
+omniroute_memory_mb: "4096"
+
+# OmniRoute container limits. Limits are ceilings, not reservations: keep the
+# memory limit about 4g above the heap for SQLite, native buffers and
+# compression work. CPU is capped at the host's vCPU count
+omniroute_memory_limit: "8g"
+omniroute_cpu_limit: "{{ [ansible_facts['processor_vcpus'] | default(2) | int, 2] | min }}"
+omniroute_pids_limit: "512"
+
+# Redis holds rate-limiter and cache data only
+omniroute_redis_maxmemory: "128mb"
+omniroute_redis_memory_limit: "256m"
+omniroute_redis_cpu_limit: "0.5"
