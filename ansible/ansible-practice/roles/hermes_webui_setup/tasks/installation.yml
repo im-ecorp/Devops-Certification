@@ -1,0 +1,116 @@
+---
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+
+# WebUI sessions and settings, kept apart from the Hermes CLI home
+- name: Create WebUI state directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}/state"
+    state: directory
+    owner: "{{ hermes_webui_home_stat.stat.uid }}"
+    group: "{{ hermes_webui_home_stat.stat.gid }}"
+    mode: "0700"
+  tags:
+    - preparing
+
+- name: Install rsync
+  ansible.builtin.package:
+    name: rsync
+    state: present
+  tags:
+    - preparing
+
+# The container installs the Agent from /opt/hermes. Host venvs and caches are
+# left out because they were built for the host's Python, not the image's.
+- name: Copy Hermes Agent source
+  ansible.builtin.command:
+    argv: >-
+      {{ ['rsync', '--archive', '--delete', '--itemize-changes']
+         + hermes_webui_agent_source_excludes | map('regex_replace', '^', '--exclude=') | list
+         + [hermes_webui_agent_dir ~ '/', service_dir ~ '/agent-source/'] }}
+  register: hermes_webui_agent_source
+  changed_when: hermes_webui_agent_source.stdout | length > 0
+  notify: Restart Hermes WebUI
+  tags:
+    - preparing
+
+- name: Copy entrypoint wrapper
+  ansible.builtin.copy:
+    src: root-entrypoint.sh
+    dest: "{{ service_dir }}/root-entrypoint.sh"
+    mode: "0755"
+  notify: Restart Hermes WebUI
+  tags:
+    - preparing
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: Restart Hermes WebUI
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+  diff: false
+  notify: Restart Hermes WebUI
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+    recreate: "{{ 'always' if hermes_webui_force_recreate | bool else 'auto' }}"
+  register: compose_deploy
+  tags:
+    - deploy
+
+# A changed Agent source or entrypoint needs a restart before the checks below
+- name: Apply pending restarts
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - deploy
+
+- name: Wait for Hermes WebUI to be available
+  ansible.builtin.uri:
+    url: "{{ hermes_webui_url }}/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: hermes_webui_health
+  until: hermes_webui_health.status == 200
+  retries: 30
+  delay: 10
+  tags:
+    - deploy

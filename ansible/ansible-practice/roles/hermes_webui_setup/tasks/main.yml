@@ -3,23 +3,17 @@
 - name: Setup Hermes WebUI Service | Preflight
   ansible.builtin.import_tasks: preflight.yml
   tags:
-    - install_hermes_webui
-    - setup_hermes_webui
-    - hermes_webui_preflight
-    - preparing
+    - always
 
-- name: Setup Hermes WebUI Service | Deploy
-  ansible.builtin.import_tasks: deploy.yml
+- name: Setup Hermes WebUI Service | Installation
+  ansible.builtin.import_tasks: installation.yml
   tags:
     - install_hermes_webui
     - setup_hermes_webui
-    - hermes_webui_deploy
-    - deploy
 
-- name: Setup Hermes WebUI Service | Verify
+- name: Setup Hermes WebUI Service | Verification
   ansible.builtin.import_tasks: verify.yml
   tags:
     - install_hermes_webui
     - setup_hermes_webui
-    - hermes_webui_verify
     - verify

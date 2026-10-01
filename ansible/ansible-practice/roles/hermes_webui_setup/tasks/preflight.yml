@@ -1,184 +1,100 @@
 ---
-# Fail fast, with an actionable message, before anything is changed on the host.
+# Checks that run before anything on the host is changed. Tagged `always`
+# because the templates read hermes_webui_home_stat.
 
-- name: Assert the required inventory-level variables are defined
-  ansible.builtin.assert:
-    that:
-      - main_domain is defined
-      - main_domain | length > 0
-      - project_dir is defined
-      - project_dir is match('^/')
-    fail_msg: >-
-      main_domain and an absolute project_dir must be set in
-      inventory/group_vars/all/general.yml.
-    quiet: true
-
-- name: Assert the WebUI login password is set and long enough
+- name: Check the WebUI login password
   ansible.builtin.assert:
     that:
       - hermes_webui_password is defined
       - hermes_webui_password | length >= hermes_webui_password_min_length | int
     fail_msg: >-
       hermes_webui_password must be at least
-      {{ hermes_webui_password_min_length }} characters. This service is
-      published on {{ hermes_webui_domain }} and an authenticated session can
-      run arbitrary commands with the mounts granted below, so a weak password
-      is a host compromise. Set vault_hermes_webui_password in
-      vars/main/vault.yml.
+      {{ hermes_webui_password_min_length }} characters, because
+      {{ hermes_webui_domain }} is public. Set it in defaults/main/vault.yml.
     quiet: true
   no_log: true
 
-- name: Warn when the image is not pinned to a digest
-  ansible.builtin.debug:
-    msg: >-
-      hermes_webui_image_digest is empty, so this deploy tracks the mutable tag
-      "{{ hermes_webui_image_tag }}". A later re-run can pull a different build
-      of the agent that has access to {{ hermes_webui_ssh_dir }} and every
-      declared workspace. Pin a digest for production.
-  when: hermes_webui_image_digest | length == 0
+- name: Check that the host executor has SSH keys to use
+  ansible.builtin.assert:
+    that:
+      - hermes_webui_ssh_enabled | bool or not hermes_webui_host_executor_enabled | bool
+    fail_msg: "hermes_webui_host_executor_enabled needs hermes_webui_ssh_enabled."
+    quiet: true
 
-- name: Assert the container runtime is usable
-  ansible.builtin.command:
-    cmd: docker version --format '{% raw %}{{ .Server.Version }}{% endraw %}'
-  register: hermes_webui_docker_version
-  changed_when: false
-  failed_when: hermes_webui_docker_version.rc != 0
-
-- name: Ensure rsync is installed for the Agent source export
-  ansible.builtin.package:
-    name: rsync
-    state: present
-
-- name: Check if the Hermes home directory already exists
+- name: Check the Hermes home directory
   ansible.builtin.stat:
     path: "{{ hermes_webui_home_dir }}"
   register: hermes_webui_home_stat
 
-- name: Require an existing Hermes CLI home
+- name: Require an existing Hermes home directory
   ansible.builtin.assert:
     that:
-      - hermes_webui_home_stat.stat.exists
+      - hermes_webui_home_stat.stat.isdir is defined
       - hermes_webui_home_stat.stat.isdir
     fail_msg: >-
-      {{ hermes_webui_home_dir }} must be the existing Hermes CLI home. This
-      role will not create or initialize it because doing so could hide a bad
-      path and start WebUI with an empty configuration.
+      {{ hermes_webui_home_dir }} is not a directory. Install Hermes on the host
+      first; this role does not create an empty Hermes home.
     quiet: true
 
-- name: Check required Hermes CLI data and installed Agent source
+- name: Check the Hermes config, session database and Agent source
   ansible.builtin.stat:
     path: "{{ item }}"
-  register: hermes_webui_required_paths
   loop:
     - "{{ hermes_webui_home_dir }}/config.yaml"
     - "{{ hermes_webui_home_dir }}/state.db"
     - "{{ hermes_webui_agent_dir }}/pyproject.toml"
-    - "{{ hermes_webui_agent_dir }}/run_agent.py"
+  register: hermes_webui_required_files
 
-- name: Require the existing config, session database, and Agent source
+- name: Require the Hermes config, session database and Agent source
   ansible.builtin.assert:
     that:
-      - item.stat.exists
+      - item.stat.isreg is defined
       - item.stat.isreg
-    fail_msg: "Required Hermes path is missing or is not a file: {{ item.item }}"
+    fail_msg: "Required Hermes file is missing: {{ item.item }}"
     quiet: true
-  loop: "{{ hermes_webui_required_paths.results }}"
+  loop: "{{ hermes_webui_required_files.results }}"
   loop_control:
     label: "{{ item.item }}"
 
-- name: Use the existing Hermes home owner inside the container
-  ansible.builtin.set_fact:
-    hermes_webui_uid: "{{ hermes_webui_home_stat.stat.uid }}"
-    hermes_webui_gid: "{{ hermes_webui_home_stat.stat.gid }}"
-    hermes_webui_root_owned_home: "{{ hermes_webui_home_stat.stat.uid | int == 0 }}"
-
-- name: Require explicit root-runtime support for a root-owned Hermes home
-  ansible.builtin.assert:
-    that:
-      - hermes_webui_allow_root_runtime | bool
-    fail_msg: >-
-      {{ hermes_webui_home_dir }} is owned by root. Set
-      hermes_webui_allow_root_runtime=true to use the guarded entrypoint that
-      preserves the existing ownership, or run Hermes under a non-root account.
-    quiet: true
-  when: hermes_webui_root_owned_home | bool
-
-# The agent's HOME follows the account the guarded entrypoint leaves it on, and
-# Ansible's `private_key_file = ~/.ssh/id_rsa` resolves against it.
-- name: Resolve the in-container home the agent will run under
-  ansible.builtin.set_fact:
-    hermes_webui_container_home: >-
-      {{
-        '/root'
-        if hermes_webui_root_owned_home | bool
-        else hermes_webui_container_user_home
-      }}
-
-# --- Workspace validation ---------------------------------------------------
-#
-# This is the check whose absence produced "the path /root/mygit is absent":
-# the agent runs in the container, so an unmounted host path simply is not
-# there. Docker would helpfully create an empty directory and hide the mistake.
-
-# Mounting a host directory over one the container needs for itself replaces
-# the OS the WebUI is running on, and the failure looks like a corrupt image.
-- name: Refuse to shadow the container's own filesystem with a workspace
-  ansible.builtin.assert:
-    that:
-      - (item.path | default(item)) | regex_replace('/$', '')
-        not in hermes_webui_workspace_forbidden_paths
-    fail_msg: >-
-      Agent workspace {{ item.path | default(item) }} would be mounted over the
-      container's own {{ item.path | default(item) }}, replacing the filesystem
-      the WebUI runs on. Reach it at
-      {{ hermes_webui_host_root_mount_point }}{{ item.path | default(item) }}
-      instead, or act on it through the host executor.
-    quiet: true
-  loop: "{{ hermes_webui_workspaces }}"
-  loop_control:
-    label: "{{ item.path | default(item) }}"
-
-- name: Check the declared agent workspaces on the host
+- name: Check the agent workspaces
   ansible.builtin.stat:
-    path: "{{ item.path | default(item) }}"
-  register: hermes_webui_workspace_stat
+    path: "{{ item.path }}"
   loop: "{{ hermes_webui_workspaces }}"
   loop_control:
-    label: "{{ item.path | default(item) }}"
+    label: "{{ item.path }}"
+  register: hermes_webui_workspace_stat
 
-- name: Require every declared agent workspace to be an absolute existing directory
+# Docker would create a missing path as an empty directory, and mounting over
+# /etc or /usr replaces the OS the WebUI runs on.
+- name: Require every workspace to be an existing, safe directory
   ansible.builtin.assert:
     that:
-      - item.item.path | default(item.item) is match('^/')
-      - item.stat.exists
+      - item.item.path is match('^/')
+      - item.item.path | regex_replace('/$', '') not in hermes_webui_workspace_forbidden_paths
+      - item.stat.isdir is defined
       - item.stat.isdir
     fail_msg: >-
-      Agent workspace {{ item.item.path | default(item.item) }} is not an
-      existing directory on {{ inventory_hostname }}. The WebUI agent can only
-      see paths mounted into its container, so deploying with this entry would
-      give the agent an empty directory and the error "the path ... is absent".
-      Create the directory, correct the path, or remove it from
-      hermes_webui_workspaces.
+      Workspace {{ item.item.path }} must be an existing absolute directory
+      outside {{ hermes_webui_workspace_forbidden_paths | join(', ') }}.
+      Reach system paths through {{ hermes_webui_host_fs_mount_point }} instead.
     quiet: true
   loop: "{{ hermes_webui_workspace_stat.results }}"
   loop_control:
-    label: "{{ item.item.path | default(item.item) }}"
-  when: hermes_webui_workspaces_must_exist | bool
+    label: "{{ item.item.path }}"
 
-- name: Check the SSH directory used by Ansible runs from the WebUI
+- name: Check the SSH private key
   ansible.builtin.stat:
-    path: "{{ hermes_webui_ssh_dir }}"
-  register: hermes_webui_ssh_stat
+    path: "{{ hermes_webui_ssh_dir }}/{{ hermes_webui_ssh_key_name }}"
+  register: hermes_webui_ssh_key_stat
   when: hermes_webui_ssh_enabled | bool
 
-- name: Require the SSH directory to exist when SSH passthrough is enabled
+- name: Require the SSH private key
   ansible.builtin.assert:
     that:
-      - hermes_webui_ssh_stat.stat.exists
-      - hermes_webui_ssh_stat.stat.isdir
+      - hermes_webui_ssh_key_stat.stat.isreg is defined
+      - hermes_webui_ssh_key_stat.stat.isreg
     fail_msg: >-
-      hermes_webui_ssh_enabled is true but {{ hermes_webui_ssh_dir }} does not
-      exist on {{ inventory_hostname }}. Provide the key material or set
-      hermes_webui_ssh_enabled=false.
+      {{ hermes_webui_ssh_dir }}/{{ hermes_webui_ssh_key_name }} is missing.
+      Provide the key or set hermes_webui_ssh_enabled=false.
     quiet: true
   when: hermes_webui_ssh_enabled | bool

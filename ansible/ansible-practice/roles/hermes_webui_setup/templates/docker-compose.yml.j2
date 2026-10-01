@@ -1,87 +1,65 @@
-# {{ ansible_managed }}
-#
-# Scalar settings are interpolated from .env (mode 0600); structure and the
-# mount list come from the role so that secrets stay out of this file.
----
 services:
 
+  # Hermes WebUI — browser front end for the Hermes Agent
   hermes-webui:
-    image: ${hermes_webui_image}
+    image: ghcr.io/nesquena/hermes-webui:${image_tag}
     container_name: hermes-webui
     hostname: hermes-webui
     restart: ${restart_policy}
     init: true
-{% if hermes_webui_root_owned_home | bool %}
-    entrypoint: ["/bin/bash", "{{ hermes_webui_container_entrypoint }}"]
-{% endif %}
+    # Wraps the upstream entrypoint so a root-owned Hermes home keeps its owner
+    entrypoint: ["/bin/bash", "/opt/hermes-webui/root-entrypoint.sh"]
     environment:
       PATH: ${hermes_webui_container_path}
-      WANTED_UID: ${wanted_uid}
-      WANTED_GID: ${wanted_gid}
-      HERMES_HOME: {{ hermes_webui_container_hermes_home }}
-      HERMES_CONFIG_PATH: {{ hermes_webui_container_hermes_home }}/config.yaml
-      HERMES_WEBUI_AGENT_DIR: {{ hermes_webui_container_agent_dir }}
+      UV_PYTHON: ${hermes_webui_python_version}
+      WANTED_UID: ${hermes_webui_uid}
+      WANTED_GID: ${hermes_webui_gid}
+      HERMES_WEBUI_ROOT_HOME_MODE: ${hermes_webui_root_home_mode}
+      HERMES_HOME: /home/hermeswebui/.hermes
+      HERMES_CONFIG_PATH: /home/hermeswebui/.hermes/config.yaml
+      HERMES_WEBUI_AGENT_DIR: /opt/hermes
+      HERMES_WEBUI_STATE_DIR: /var/lib/hermes-webui
       HERMES_WEBUI_HOST: 0.0.0.0
       HERMES_WEBUI_PORT: ${hermes_webui_port}
-      HERMES_WEBUI_STATE_DIR: {{ hermes_webui_container_state_dir }}
-      HERMES_WEBUI_SKIP_ONBOARDING: ${hermes_webui_skip_onboarding}
       HERMES_WEBUI_PASSWORD: ${hermes_webui_password}
       HERMES_WEBUI_SECURE: ${hermes_webui_secure}
-      HERMES_WEBUI_ALLOWED_ORIGINS: ${hermes_webui_allowed_origins}
-      HERMES_WEBUI_TRUST_FORWARDED_HOST: ${hermes_webui_trust_forwarded_host}
-      HERMES_WEBUI_TRUST_FORWARDED_FOR: ${hermes_webui_trust_forwarded_for}
-      HERMES_WEBUI_TRUST_FORWARDED_PROTO: ${hermes_webui_trust_forwarded_proto}
+      HERMES_WEBUI_ALLOWED_ORIGINS: ${hermes_webui_url}
+      HERMES_WEBUI_TRUST_FORWARDED_HOST: ${hermes_webui_trust_forwarded}
+      HERMES_WEBUI_TRUST_FORWARDED_FOR: ${hermes_webui_trust_forwarded}
+      HERMES_WEBUI_TRUST_FORWARDED_PROTO: ${hermes_webui_trust_forwarded}
+      HERMES_WEBUI_SKIP_ONBOARDING: ${hermes_webui_skip_onboarding}
       HERMES_SKIP_CHMOD: ${hermes_webui_skip_chmod}
-{% if hermes_webui_host_root_enabled | bool %}
-      # Prefix where the whole host filesystem is readable, e.g. the host's
-      # /etc/nginx is {{ hermes_webui_host_root_mount_point }}/etc/nginx.
-      HERMES_HOST_FS: "{{ hermes_webui_host_root_mount_point }}"
-{% endif %}
-{% if hermes_webui_root_owned_home | bool %}
-      HERMES_WEBUI_ROOT_HOME_MODE: 1
+{% if hermes_webui_host_fs_enabled | bool %}
+      # Prefix of the whole host filesystem (the host's /etc is /host/etc)
+      HERMES_HOST_FS: ${hermes_webui_host_fs_mount_point}
 {% endif %}
 {% if hermes_webui_host_executor_enabled | bool %}
-      # How the agent reaches the host to run Ansible; see the role README.
-      # A non-interactive ssh session carries no locale, and Ansible refuses to
-      # start without a UTF-8 one, so the prefix is part of the contract.
-      HERMES_HOST_EXECUTOR: "{{ hermes_webui_host_alias }}:{{ hermes_webui_host_ssh_port }}"
-      # UserKnownHostsFile=/dev/null because ~/.ssh is mounted read-only, so
-      # ssh cannot record the host key and would warn on every invocation.
-      HERMES_HOST_EXECUTOR_SSH: "ssh -p {{ hermes_webui_host_ssh_port }} -i ~/.ssh/{{ hermes_webui_ssh_private_key_name }} -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR root@{{ hermes_webui_host_alias }}"
-      HERMES_HOST_EXECUTOR_ENV: "{{ hermes_webui_host_executor_env_prefix | trim }}"
-    # Publishes the Docker host itself under a stable name, so the agent can
-    # SSH back to the machine that has ansible-core, the collections, the
-    # inventory and the vault password.
+      # How the agent runs commands on the host; see the role README
+      HERMES_HOST_EXECUTOR: ${hermes_webui_host_executor}
+      HERMES_HOST_EXECUTOR_SSH: ${hermes_webui_host_executor_ssh}
+      HERMES_HOST_EXECUTOR_ENV: ${hermes_webui_host_executor_env}
     extra_hosts:
-      - "{{ hermes_webui_host_alias }}:host-gateway"
+      - "${hermes_webui_host_alias}:host-gateway"
 {% endif %}
     volumes:
-      # Existing Hermes CLI home: config.yaml, auth.json and the session DB.
-      - "{{ hermes_webui_home_dir }}:{{ hermes_webui_container_hermes_home }}"
-      # Filtered copy of the installed Agent source.
-      - "{{ hermes_webui_agent_export_dir }}:{{ hermes_webui_container_agent_dir }}:ro"
-      # WebUI-owned state, deliberately outside the CLI home.
-      - "{{ hermes_webui_state_dir }}:{{ hermes_webui_container_state_dir }}"
-{% if hermes_webui_root_owned_home | bool %}
-      - "{{ hermes_webui_entrypoint_path }}:{{ hermes_webui_container_entrypoint }}:ro"
-{% endif %}
-{% if hermes_webui_workspaces | length > 0 %}
-      # Agent workspaces, mounted at their host paths so a path typed in the
-      # WebUI resolves to the same file the host sees.
+      # Existing Hermes CLI home: config.yaml, auth.json and state.db
+      - ${hermes_webui_home_dir}:/home/hermeswebui/.hermes
+      # Copy of the installed Agent source
+      - ./agent-source:/opt/hermes:ro
+      # WebUI sessions and settings
+      - ./state:/var/lib/hermes-webui
+      - ./root-entrypoint.sh:/opt/hermes-webui/root-entrypoint.sh:ro
+      # Workspaces, mounted at their host paths
 {% for workspace in hermes_webui_workspaces %}
-{% set workspace_path = workspace.path | default(workspace) %}
-      - "{{ workspace_path }}:{{ workspace_path }}{{ ':ro' if workspace.read_only | default(false) else '' }}"
+      - {{ workspace.path }}:{{ workspace.path }}:{{ 'ro' if workspace.read_only | default(false) | bool else 'rw' }}
 {% endfor %}
-{% endif %}
-{% if hermes_webui_host_root_enabled | bool %}
-      # The whole host filesystem under a single prefix, so the agent can reach
-      # /etc, /var and everything else without shadowing the container's own OS.
-      - "{{ hermes_webui_host_root_path }}:{{ hermes_webui_host_root_mount_point }}{{ ':ro' if hermes_webui_host_root_read_only | bool else '' }}"
+{% if hermes_webui_host_fs_enabled | bool %}
+      # Whole host filesystem, without shadowing the container's own OS
+      - /:${hermes_webui_host_fs_mount_point}:${hermes_webui_host_fs_mode}
 {% endif %}
 {% if hermes_webui_ssh_enabled | bool %}
-      # Read-only SSH material so Ansible run from the WebUI can reach the
-      # inventory hosts. Resolves as ~/.ssh for the in-container account.
-      - "{{ hermes_webui_ssh_dir }}:{{ hermes_webui_container_home }}/.ssh:ro"
+      # Host SSH keys as the agent's ~/.ssh
+      - ${hermes_webui_ssh_dir}:${hermes_webui_container_home}/.ssh:ro
 {% endif %}
     security_opt:
       - no-new-privileges:true
@@ -94,34 +72,29 @@ services:
         max-size: ${hermes_webui_log_max_size}
         max-file: ${hermes_webui_log_max_file}
     networks:
-{% for network in hermes_webui_service_networks %}
-      - {{ network }}
-{% endfor %}
+      - web_net
     healthcheck:
-      test:
-        - "CMD"
-        - "python3"
-        - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ hermes_webui_port }}/health')"
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${hermes_webui_port}/health')"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network={{ hermes_webui_traefik_network }}"
+      - "traefik.docker.network=web_net"
       - "traefik.http.routers.http-hermes-webui.rule=Host(`${hermes_webui_domain}`)"
       - "traefik.http.routers.http-hermes-webui.entrypoints=web"
       - "traefik.http.routers.hermes-webui.rule=Host(`${hermes_webui_domain}`)"
       - "traefik.http.routers.hermes-webui.entrypoints=web-secure"
       - "traefik.http.routers.hermes-webui.tls=true"
-      - "traefik.http.routers.hermes-webui.tls.certresolver={{ hermes_webui_traefik_certresolver }}"
+      - "traefik.http.routers.hermes-webui.tls.certresolver=myproduction"
       - "traefik.http.routers.hermes-webui.service=hermes-webui"
       - "traefik.http.services.hermes-webui.loadBalancer.server.port=${hermes_webui_port}"
 
 networks:
-{% for network in hermes_webui_service_networks %}
-  {{ network }}:
-    name: {{ network }}
+  web_net:
+    name: web_net
     external: true
-{% endfor %}
+  app_net:
+    name: app_net
+    external: true
