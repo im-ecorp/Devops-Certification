@@ -6,6 +6,13 @@
     - install_gitlab
     - setup_gitlab
 
+- name: Configuration GitLab | Application settings
+  ansible.builtin.import_tasks: settings.yml
+  tags:
+    - setup_gitlab
+    - config_gitlab
+    - settings
+
 - name: Configuration GitLab | Configure Runners
   ansible.builtin.include_tasks: configure-runner.yml
   loop: "{{ gitlab_runners }}"

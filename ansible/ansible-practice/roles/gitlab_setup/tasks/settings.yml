@@ -1,0 +1,49 @@
+---
+
+# Sign-up and Web IDE settings are Admin area settings stored in the database;
+# gitlab.rb has no option for them. Reading them with psql is fast, so the slow
+# Rails console only runs when a value has to change.
+- name: Read GitLab application settings
+  community.docker.docker_container_exec:
+    container: gitlab
+    argv:
+      - gitlab-psql
+      - -qtAc
+      - >-
+        SELECT json_build_object(
+          'signup_enabled', signup_enabled,
+          'extension_host_domain', vscode_extension_marketplace->>'extension_host_domain',
+          'single_origin_fallback_enabled', vscode_extension_marketplace->'single_origin_fallback_enabled'
+        ) FROM application_settings ORDER BY id DESC LIMIT 1
+  register: gitlab_settings_raw
+  changed_when: false
+
+# Keys missing from the JSON column (null) mean GitLab's defaults apply. Only
+# null is replaced: a stored false must stay false.
+- name: Compare GitLab application settings
+  vars:
+    gitlab_settings_stored: "{{ gitlab_settings_raw.stdout | from_json }}"
+  ansible.builtin.set_fact:
+    gitlab_settings_current:
+      signup_enabled: "{{ gitlab_settings_stored.signup_enabled | bool }}"
+      extension_host_domain: "{{ gitlab_settings_stored.extension_host_domain or 'cdn.web-ide.gitlab-static.net' }}"
+      single_origin_fallback_enabled: "{{ true if gitlab_settings_stored.single_origin_fallback_enabled is none else gitlab_settings_stored.single_origin_fallback_enabled | bool }}"
+    gitlab_settings_desired:
+      signup_enabled: "{{ gitlab_signup_enabled | bool }}"
+      extension_host_domain: "{{ gitlab_web_ide_extension_host_domain }}"
+      single_origin_fallback_enabled: "{{ gitlab_web_ide_single_origin_fallback_enabled | bool }}"
+
+# Documented method: ::Gitlab::CurrentSettings.update! validates the values and
+# refreshes GitLab's settings cache, so no restart is needed.
+- name: Apply GitLab application settings
+  community.docker.docker_container_exec:
+    container: gitlab
+    argv:
+      - gitlab-rails
+      - runner
+      - >-
+        ::Gitlab::CurrentSettings.update!(
+        signup_enabled: {{ gitlab_signup_enabled | bool | lower }},
+        vscode_extension_marketplace_extension_host_domain: '{{ gitlab_web_ide_extension_host_domain }}',
+        vscode_extension_marketplace_single_origin_fallback_enabled: {{ gitlab_web_ide_single_origin_fallback_enabled | bool | lower }})
+  when: gitlab_settings_current != gitlab_settings_desired

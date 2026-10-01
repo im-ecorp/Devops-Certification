@@ -1,5 +1,18 @@
 ---
 
+- name: Validate GitLab variables
+  ansible.builtin.assert:
+    that:
+      - not gitlab_smtp_enable | bool or gitlab_smtp_password | length > 0
+      - not gitlab_minio_enabled | bool or (gitlab_minio_access_key | length > 0 and gitlab_minio_secret_key | length > 0)
+    fail_msg: >-
+      Set gitlab_smtp_password (when gitlab_smtp_enable is true) and
+      gitlab_minio_access_key / gitlab_minio_secret_key (when gitlab_minio_enabled
+      is true) in defaults/main/vault.yml.
+    quiet: true
+  tags:
+    - preparing
+
 - name: Create Docker networks
   community.docker.docker_network:
     name: "{{ item }}"
@@ -12,6 +25,14 @@
   tags:
     - preparing
     - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
 
 - name: Template Docker Compose file
   ansible.builtin.template:
@@ -44,3 +65,42 @@
   register: compose_deploy
   tags:
     - deploy
+
+# The first start runs database migrations and can take several minutes.
+- name: Wait for GitLab to be available
+  ansible.builtin.uri:
+    url: "{{ gitlab_main_url }}/users/sign_in"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: gitlab_health
+  until: gitlab_health.status == 200
+  retries: 60
+  delay: 15
+  tags:
+    - deploy
+
+# Last item of GitLab's memory-constrained guide. Takes effect after one restart.
+- name: Disable in-app Prometheus metrics
+  community.docker.docker_container_exec:
+    container: gitlab
+    argv:
+      - gitlab-psql
+      - -qtAc
+      - "UPDATE application_settings SET prometheus_metrics_enabled = false WHERE prometheus_metrics_enabled RETURNING id"
+  register: gitlab_metrics_setting
+  changed_when: gitlab_metrics_setting.stdout | trim | length > 0
+  when: gitlab_low_memory | bool
+  notify: Restart GitLab
+  tags:
+    - deploy
+
+- name: Schedule daily GitLab backup
+  ansible.builtin.cron:
+    name: "gitlab-backup"
+    hour: "{{ gitlab_backup_cron_hour }}"
+    minute: "{{ gitlab_backup_cron_minute }}"
+    job: "docker exec gitlab gitlab-backup create CRON=1"
+    state: "{{ 'present' if gitlab_backup_cron_enabled | bool else 'absent' }}"
+  tags:
+    - backup
