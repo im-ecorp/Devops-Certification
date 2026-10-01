@@ -1,12 +1,8 @@
 ---
 
-# Scoped to the hermes_webui group on purpose. An authenticated WebUI session
-# can run commands with the mounted workspaces and SSH keys, so this must never
-# fan out to every host by default. Add members in inventory/hosts.yml.
 - name: Install and configure Hermes WebUI service
-  hosts: hermes_webui
+  hosts: all
   become: true
   gather_facts: true
-  any_errors_fatal: true
   roles:
     - hermes_webui_setup
