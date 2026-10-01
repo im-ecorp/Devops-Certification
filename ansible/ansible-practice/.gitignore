@@ -4,3 +4,6 @@
 *.vault-password
 .facts/
 vault.pass
+scripts/
+AGENTS.md
+CLAUDE.md
