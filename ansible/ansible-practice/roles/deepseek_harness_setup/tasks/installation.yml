@@ -1,5 +1,18 @@
 ---
 
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
 - name: Create service directory
   ansible.builtin.file:
     path: "{{ service_dir }}"
@@ -8,6 +21,7 @@
   tags:
     - preparing
 
+# Owned by the image's node user (1000), which runs the container
 - name: Create persistent data directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -21,19 +35,12 @@
   tags:
     - preparing
 
-- name: Template Dockerfile
-  ansible.builtin.template:
-    src: Dockerfile.j2
-    dest: "{{ service_dir }}/Dockerfile"
-    mode: "0644"
-  tags:
-    - preparing
-
-- name: Template entrypoint script
-  ansible.builtin.template:
-    src: entrypoint.sh.j2
+- name: Copy entrypoint script
+  ansible.builtin.copy:
+    src: entrypoint.sh
     dest: "{{ service_dir }}/entrypoint.sh"
     mode: "0755"
+  notify: Restart DeepSeek Harness
   tags:
     - preparing
 
@@ -42,18 +49,20 @@
     src: docker-compose.yml.j2
     dest: "{{ service_dir }}/docker-compose.yml"
     mode: "0644"
+  notify: Restart DeepSeek Harness
   tags:
     - preparing
 
-- name: Template Traefik dynamic configuration
+- name: Template environment file
   ansible.builtin.template:
-    src: deepseek-traefik.yml.j2
-    dest: "{{ project_dir }}/traefik/dynamic/deepseek.yml"
-    mode: "0644"
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+  notify: Restart DeepSeek Harness
   tags:
     - preparing
 
-- name: Pull base images
+- name: Pull Docker images
   community.docker.docker_compose_v2_pull:
     project_src: "{{ service_dir }}"
   register: compose_pull
@@ -64,7 +73,20 @@
   community.docker.docker_compose_v2:
     project_src: "{{ service_dir }}"
     state: present
-    build: always
   register: compose_deploy
+  tags:
+    - deploy
+
+# Traefik basic auth guards the UI, so 401 means the route is up
+- name: Wait for DeepSeek Harness to be available
+  ansible.builtin.uri:
+    url: "{{ deepseek_url }}/"
+    method: GET
+    status_code: [200, 401]
+    timeout: 10
+  register: deepseek_health
+  until: deepseek_health.status in [200, 401]
+  retries: 30
+  delay: 10
   tags:
     - deploy

@@ -1,6 +1,10 @@
 ---
 # Default variables for DeepSeek Harness setup
 
+# Docker image tag of the official node image; dsh has no published image, so
+# the entrypoint installs it into the home volume (full tag ships git, ssh, curl)
+deepseek_image_tag: "24-bookworm"
+
 # Package version of @deepseek-ai/dsh
 deepseek_dsh_version: "latest"
 
@@ -12,3 +16,7 @@ service_dir: "{{ project_dir }}/deepseek-harness"
 
 # DeepSeek Harness domain
 deepseek_domain: "deepseek.{{ main_domain }}"
+deepseek_url: "https://{{ deepseek_domain }}"
+
+# Port served to Traefik; it forwards to dsh, which binds loopback only
+deepseek_port: "3081"

@@ -1,20 +1,26 @@
 # {{ ansible_managed }}
 ---
 services:
+
+  # DeepSeek Harness — dsh web UI on the official node image
   deepseek-harness:
-    build:
-      context: .
-      args:
-        DSH_VERSION: "{{ deepseek_dsh_version }}"
-    image: local/deepseek-harness:{{ deepseek_dsh_version }}
+    image: node:${image_tag}
     container_name: deepseek-harness
-    restart: {{ restart_policy }}
+    hostname: deepseek-harness
+    restart: ${restart_policy}
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "/usr/local/bin/deepseek-harness-entrypoint"]
+    working_dir: /workspace
     environment:
       HOME: /home/node
       DSH_HOME: /home/node/.dsh
+      DSH_VERSION: ${deepseek_dsh_version}
+      DSH_DOMAIN: ${deepseek_domain}
+      DSH_PORT: ${deepseek_port}
     volumes:
       - ./home:/home/node
       - ./workspace:/workspace
+      - ./entrypoint.sh:/usr/local/bin/deepseek-harness-entrypoint:ro
     networks:
       - web_net
     read_only: true
@@ -25,13 +31,28 @@ services:
     cap_drop:
       - ALL
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3081/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${deepseek_port}/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 45s
+      start_period: 120s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-deepseek-harness.rule=Host(`${deepseek_domain}`)"
+      - "traefik.http.routers.http-deepseek-harness.entrypoints=web"
+      - "traefik.http.routers.deepseek-harness.rule=Host(`${deepseek_domain}`)"
+      - "traefik.http.routers.deepseek-harness.entrypoints=web-secure"
+      - "traefik.http.routers.deepseek-harness.tls=true"
+      - "traefik.http.routers.deepseek-harness.tls.certresolver=myproduction"
+      - "traefik.http.routers.deepseek-harness.middlewares=web-auth@docker"
+      - "traefik.http.routers.deepseek-harness.service=deepseek-harness"
+      - "traefik.http.services.deepseek-harness.loadBalancer.server.port=${deepseek_port}"
 
 networks:
   web_net:
     name: web_net
+    external: true
+  app_net:
+    name: app_net
     external: true
