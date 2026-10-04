@@ -50,10 +50,10 @@ See `defaults/main/main.yml` for all configurable variables.
 | `gitlab_backup_cron_hour` / `_minute` | `3` / `0` | Backup time |
 | `gitlab_backup_keep_time` | `604800` | Keep local backups for 7 days |
 | `gitlab_backup_skip` | `registry` | Components left out of backups |
-| `gitlab_minio_enabled` | `false` | Copy each backup to MinIO |
-| `gitlab_minio_endpoint` | `https://minio-api.{{ main_domain }}` | MinIO API endpoint |
-| `gitlab_minio_region` | `us-east-1` | S3 region |
-| `gitlab_minio_bucket` | `gitlab-backups` | Bucket for backups |
+| `gitlab_backup_s3_enabled` | `false` | Copy each backup to S3-compatible storage |
+| `gitlab_backup_s3_endpoint` | `https://s3.{{ main_domain }}` | S3 API endpoint |
+| `gitlab_backup_s3_region` | `us-east-1` | S3 region |
+| `gitlab_backup_s3_bucket` | `gitlab-backups` | Bucket for backups |
 
 Secrets (vault)
 ---------------
@@ -64,7 +64,7 @@ Secrets (vault)
 |---|---|
 | `gitlab_root_password` | Initial `root` password (applied on first start only) |
 | `gitlab_smtp_password` | Password of `gitlab_smtp_username` |
-| `gitlab_minio_access_key` / `gitlab_minio_secret_key` | Only when `gitlab_minio_enabled` is true |
+| `gitlab_backup_s3_access_key` / `gitlab_backup_s3_secret_key` | Only when `gitlab_backup_s3_enabled` is true |
 
 Secrets reach GitLab as container environment variables and are read in
 `gitlab.rb` through `ENV[...]`, so any character is safe in them.
@@ -89,8 +89,8 @@ Backups
 
 The host's cron runs `docker exec gitlab gitlab-backup create CRON=1` daily.
 Archives go to the `gitlab_backups` volume and are pruned after
-`gitlab_backup_keep_time`. With `gitlab_minio_enabled: true` each archive is
-also uploaded to MinIO.
+`gitlab_backup_keep_time`. With `gitlab_backup_s3_enabled: true` each archive is
+also uploaded to S3-compatible storage.
 
 The backup archive does not contain `/etc/gitlab/gitlab-secrets.json`. It lives
 in the `gitlab_config` volume; keep a copy of it somewhere safe, or restored

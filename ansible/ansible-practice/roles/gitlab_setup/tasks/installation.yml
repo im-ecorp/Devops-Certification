@@ -4,10 +4,10 @@
   ansible.builtin.assert:
     that:
       - not gitlab_smtp_enable | bool or gitlab_smtp_password | length > 0
-      - not gitlab_minio_enabled | bool or (gitlab_minio_access_key | length > 0 and gitlab_minio_secret_key | length > 0)
+      - not gitlab_backup_s3_enabled | bool or (gitlab_backup_s3_access_key | length > 0 and gitlab_backup_s3_secret_key | length > 0)
     fail_msg: >-
       Set gitlab_smtp_password (when gitlab_smtp_enable is true) and
-      gitlab_minio_access_key / gitlab_minio_secret_key (when gitlab_minio_enabled
+      gitlab_backup_s3_access_key / gitlab_backup_s3_secret_key (when gitlab_backup_s3_enabled
       is true) in defaults/main/vault.yml.
     quiet: true
   tags:

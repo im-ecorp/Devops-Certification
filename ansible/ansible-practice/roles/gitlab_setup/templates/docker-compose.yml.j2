@@ -24,9 +24,9 @@ services:
 {% if gitlab_smtp_enable | bool %}
       GITLAB_SMTP_PASSWORD: ${GITLAB_SMTP_PASSWORD}
 {% endif %}
-{% if gitlab_minio_enabled | bool %}
-      GITLAB_MINIO_ACCESS_KEY: ${GITLAB_MINIO_ACCESS_KEY}
-      GITLAB_MINIO_SECRET_KEY: ${GITLAB_MINIO_SECRET_KEY}
+{% if gitlab_backup_s3_enabled | bool %}
+      GITLAB_BACKUP_S3_ACCESS_KEY: ${GITLAB_BACKUP_S3_ACCESS_KEY}
+      GITLAB_BACKUP_S3_SECRET_KEY: ${GITLAB_BACKUP_S3_SECRET_KEY}
 {% endif %}
       GITLAB_OMNIBUS_CONFIG: |
         # ---------------------
@@ -90,18 +90,18 @@ services:
         gitlab_rails['backup_path'] = "/var/opt/gitlab/backups"
         gitlab_rails['backup_archive_permissions'] = 0644
         gitlab_rails['backup_keep_time'] = ${gitlab_backup_keep_time}
-{% if gitlab_minio_enabled | bool %}
+{% if gitlab_backup_s3_enabled | bool %}
 
-        # Backup — copy to MinIO
+        # Backup — copy to S3-compatible storage
         gitlab_rails['backup_upload_connection'] = {
           'provider' => 'AWS',
-          'region' => '${gitlab_minio_region}',
-          'aws_access_key_id' => ENV['GITLAB_MINIO_ACCESS_KEY'],
-          'aws_secret_access_key' => ENV['GITLAB_MINIO_SECRET_KEY'],
-          'endpoint' => '${gitlab_minio_endpoint}',
+          'region' => '${gitlab_backup_s3_region}',
+          'aws_access_key_id' => ENV['GITLAB_BACKUP_S3_ACCESS_KEY'],
+          'aws_secret_access_key' => ENV['GITLAB_BACKUP_S3_SECRET_KEY'],
+          'endpoint' => '${gitlab_backup_s3_endpoint}',
           'path_style' => true
         }
-        gitlab_rails['backup_upload_remote_directory'] = '${gitlab_minio_bucket}'
+        gitlab_rails['backup_upload_remote_directory'] = '${gitlab_backup_s3_bucket}'
         gitlab_rails['backup_multipart_chunk_size'] = 104857600
 {% endif %}
 
