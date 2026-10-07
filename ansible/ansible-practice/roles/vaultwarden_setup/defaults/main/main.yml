@@ -1,0 +1,74 @@
+---
+# Default variables for Vaultwarden setup
+
+# Vaultwarden Docker image tag
+vaultwarden_image_tag: "1.37.4"
+
+# Container restart policy (always, on-failure, unless-stopped)
+restart_policy: "unless-stopped"
+
+# Service directory on the remote host
+service_dir: "{{ project_dir }}/vaultwarden"
+
+# Domain name for Vaultwarden (used by Traefik)
+vaultwarden_main_domain: "vault.k8sforfun.com"
+
+# Public HTTPS URL used by clients and generated links
+vaultwarden_main_url: "https://{{ vaultwarden_main_domain }}"
+
+# Internal container port for web traffic
+vaultwarden_port: 80
+
+# Enable WebSocket notifications on the main HTTP port
+vaultwarden_websocket_enabled: true
+
+# Signups allowed (true or false)
+vaultwarden_signups_allowed: false
+
+# Invitations allowed (true or false)
+vaultwarden_invitations_allowed: true
+
+# Show password hints on public pages (keep false in production)
+vaultwarden_show_password_hint: false
+
+# Password hints feature allowed at all (set false to prevent hints entirely)
+vaultwarden_password_hints_allowed: false
+
+# Admin panel enabled (recommended: false until needed for onboarding or diagnostics)
+vaultwarden_admin_token_enabled: true
+
+# Admin session lifetime in minutes when admin panel is active
+vaultwarden_admin_session_lifetime: 20
+
+# Admin panel request rate limit average interval in seconds
+vaultwarden_admin_ratelimit_seconds: 300
+
+# Admin panel rate limit burst allowance
+vaultwarden_admin_ratelimit_max_burst: 3
+
+# Public login rate limit average interval in seconds
+vaultwarden_login_ratelimit_seconds: 60
+
+# Public login rate limit burst allowance (covers password + 2FA attempts)
+vaultwarden_login_ratelimit_max_burst: 10
+
+# Enable SMTP mail notifications
+vaultwarden_smtp_enabled: true
+
+# SMTP server reachable from inside the container (not the host loopback)
+vaultwarden_smtp_host: "mail.k8sforfun.com"
+
+# SMTP server port
+vaultwarden_smtp_port: 587
+
+# Sender email address
+vaultwarden_smtp_from: "admin@k8sforfun.com"
+
+# Sender display name
+vaultwarden_smtp_from_name: "Vaultwarden"
+
+# SMTP encryption mode (starttls, force_tls, off)
+vaultwarden_smtp_security: "starttls"
+
+# SMTP username; empty permits an unauthenticated relay
+vaultwarden_smtp_username: "admin@k8sforfun.com"

@@ -1,0 +1,108 @@
+---
+
+- name: Validate Vaultwarden configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_main_url == 'https://' ~ vaultwarden_main_domain
+      - vaultwarden_port | int > 0
+      - vaultwarden_port | int < 65536
+      - not vaultwarden_admin_token_enabled or (vaultwarden_admin_token | default('')).startswith('$argon2id$')
+      - not vaultwarden_smtp_enabled or vaultwarden_smtp_host | length > 0
+      - not vaultwarden_smtp_enabled or vaultwarden_smtp_from | length > 0
+      - not vaultwarden_smtp_enabled or vaultwarden_smtp_security in ['starttls', 'force_tls', 'off']
+      - not vaultwarden_smtp_enabled or vaultwarden_smtp_username | length == 0 or vaultwarden_smtp_password | default('') | length > 0
+    fail_msg: "Check the HTTPS domain, port, admin Argon2id hash and SMTP settings before deploying."
+  no_log: true
+  tags:
+    - preparing
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+    backup: true
+  notify: Restart Vaultwarden
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+    backup: true
+  no_log: true
+  diff: false
+  notify: Restart Vaultwarden
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  register: compose_pull
+  when: not ansible_check_mode
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+  register: compose_deploy
+  when: not ansible_check_mode
+  tags:
+    - deploy
+
+- name: Apply pending Vaultwarden restart
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - deploy
+
+- name: Wait for Vaultwarden container to be healthy
+  community.docker.docker_container_info:
+    name: vaultwarden
+  register: vaultwarden_container
+  until: >-
+    ((vaultwarden_container.container | default({})).get('State', {}).get('Health', {}).get('Status', '')) == 'healthy'
+  retries: 30
+  delay: 10
+  when: not ansible_check_mode
+  tags:
+    - deploy
+
+- name: Wait for Vaultwarden to be available
+  ansible.builtin.uri:
+    url: "{{ vaultwarden_main_url }}/alive"
+    method: GET
+    status_code: 200
+    timeout: 10
+    validate_certs: true
+  register: vaultwarden_health
+  until: vaultwarden_health.status | default(0) == 200
+  retries: 30
+  delay: 10
+  when: not ansible_check_mode
+  tags:
+    - deploy

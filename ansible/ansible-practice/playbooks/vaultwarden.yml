@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure Vaultwarden service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - vaultwarden_setup

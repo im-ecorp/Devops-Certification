@@ -1,0 +1,7 @@
+---
+
+- name: Setup Vaultwarden Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_vaultwarden
+    - setup_vaultwarden

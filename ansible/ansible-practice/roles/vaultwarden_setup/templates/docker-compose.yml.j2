@@ -1,0 +1,69 @@
+services:
+  # Vaultwarden — Bitwarden-compatible password manager
+  vaultwarden:
+    image: vaultwarden/server:${image_tag}
+    container_name: vaultwarden
+    hostname: vaultwarden
+    restart: ${restart_policy}
+    environment:
+      DOMAIN: ${DOMAIN}
+      ROCKET_PORT: ${ROCKET_PORT}
+      SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED}
+      INVITATIONS_ALLOWED: ${INVITATIONS_ALLOWED}
+      SHOW_PASSWORD_HINT: ${SHOW_PASSWORD_HINT}
+      PASSWORD_HINTS_ALLOWED: ${PASSWORD_HINTS_ALLOWED}
+      ENABLE_WEBSOCKET: ${ENABLE_WEBSOCKET}
+      LOGIN_RATELIMIT_SECONDS: ${LOGIN_RATELIMIT_SECONDS}
+      LOGIN_RATELIMIT_MAX_BURST: ${LOGIN_RATELIMIT_MAX_BURST}
+{% if vaultwarden_admin_token_enabled %}
+      ADMIN_SESSION_LIFETIME: ${ADMIN_SESSION_LIFETIME}
+      ADMIN_RATELIMIT_SECONDS: ${ADMIN_RATELIMIT_SECONDS}
+      ADMIN_RATELIMIT_MAX_BURST: ${ADMIN_RATELIMIT_MAX_BURST}
+{% endif %}
+{% if vaultwarden_admin_token_enabled and vaultwarden_admin_token %}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+{% endif %}
+{% if vaultwarden_smtp_enabled %}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      SMTP_SECURITY: ${SMTP_SECURITY}
+{% if vaultwarden_smtp_username %}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+{% endif %}
+{% endif %}
+    volumes:
+      - vaultwarden_data:/data
+    networks:
+      - web_net
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-vaultwarden.rule=Host(`${vaultwarden_main_domain}`)"
+      - "traefik.http.routers.http-vaultwarden.entrypoints=web"
+      - "traefik.http.routers.vaultwarden.rule=Host(`${vaultwarden_main_domain}`)"
+      - "traefik.http.routers.vaultwarden.entrypoints=web-secure"
+      - "traefik.http.routers.vaultwarden.tls=true"
+      - "traefik.http.routers.vaultwarden.tls.certresolver=myproduction"
+      - "traefik.http.routers.vaultwarden.service=vaultwarden"
+      - "traefik.http.services.vaultwarden.loadBalancer.server.port=${ROCKET_PORT}"
+
+networks:
+  web_net:
+    name: web_net
+    external: true
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  vaultwarden_data:
+    name: vaultwarden_data
