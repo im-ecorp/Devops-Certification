@@ -1,2 +1,16 @@
 ---
-# handlers file for nginx
+- name: Validate nginx_setup Nginx configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ nginx_binary }}"
+      - -t
+  changed_when: false
+  when: not ansible_check_mode
+  listen: Reload nginx_setup Nginx
+
+- name: Reload nginx_setup Nginx service
+  ansible.builtin.service:
+    name: "{{ nginx_service_name }}"
+    state: reloaded
+  when: not ansible_check_mode
+  listen: Reload nginx_setup Nginx

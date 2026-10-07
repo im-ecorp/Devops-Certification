@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+map $http_upgrade $nginx_setup_connection_upgrade {
+    default upgrade;
+    ''      close;
+}

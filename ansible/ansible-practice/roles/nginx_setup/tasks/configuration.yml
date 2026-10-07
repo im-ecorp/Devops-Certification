@@ -1,0 +1,182 @@
+---
+- name: Validate Nginx site list
+  ansible.builtin.assert:
+    that:
+      - nginx_sites is sequence
+      - nginx_sites is not string
+      - nginx_sites is not mapping
+      - >-
+        nginx_sites | map(attribute='name') | unique | length == nginx_sites |
+        length
+    fail_msg: "nginx_sites must be a list of uniquely named sites."
+  tags:
+    - always
+
+- name: Validate Nginx site settings
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+      - item.name != 'default'
+      - item.server_name is match('^[A-Za-z0-9*_. -]+$')
+      - >-
+        (item.proxy_pass | default('') | length > 0) != (item.root |
+        default('') | length > 0)
+      - >-
+        item.proxy_pass | default('http://127.0.0.1') is
+        match('^https?://[^\s;{}]+$')
+      - item.root | default('/var/www/html') is match('^/[^\s;{}]+$')
+      - item.listen_port | default(80) | int >= 1
+      - item.listen_port | default(80) | int <= 65535
+      - item.ssl_port | default(443) | int >= 1
+      - item.ssl_port | default(443) | int <= 65535
+      - item.ssl_enabled | default(false) | type_debug == 'bool'
+      - >-
+        not (item.ssl_enabled | default(false)) or item.ssl_cert_path |
+        default('') is match('^/[^\s;{}]+$')
+      - >-
+        not (item.ssl_enabled | default(false)) or item.ssl_key_path |
+        default('') is match('^/[^\s;{}]+$')
+      - >-
+        item.client_max_body_size | default(nginx_client_max_body_size) is
+        match('^[0-9]+[kKmMgG]?$')
+      - >-
+        item.proxy_read_timeout | default(nginx_proxy_read_timeout) is
+        match('^[0-9]+[smhd]?$')
+    fail_msg: >-
+      Invalid Nginx site: use a safe name, server_name, exactly one
+      proxy_pass/root, and certificate paths for TLS.
+  loop: "{{ nginx_sites }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  tags:
+    - always
+
+- name: Check existing Nginx site files
+  ansible.builtin.stat:
+    path: "/etc/nginx/sites-available/{{ item.name }}"
+  loop: "{{ nginx_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: nginx_existing_sites
+
+- name: Read existing Nginx site headers
+  ansible.builtin.slurp:
+    src: "/etc/nginx/sites-available/{{ item.item.name }}"
+  loop: "{{ nginx_existing_sites.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.stat.exists
+  changed_when: false
+  register: nginx_existing_site_headers
+
+- name: Reject existing site files not owned by nginx_setup
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.skipped | default(false) or
+        (item.content | default('') | b64decode).split('\n')[0] ==
+        '# Ansible managed by nginx_setup'
+    fail_msg: >-
+      Site {{ item.item.item.name }} already exists and is not managed by
+      nginx_setup. Choose another name; this role will not overwrite it.
+  loop: "{{ nginx_existing_site_headers.results }}"
+  loop_control:
+    label: "{{ item.item.item.name }}"
+
+- name: Check existing TLS certificate files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop: >-
+    {{ nginx_sites | selectattr('ssl_enabled', 'defined') |
+       selectattr('ssl_enabled') | map(attribute='ssl_cert_path') | list +
+       nginx_sites | selectattr('ssl_enabled', 'defined') |
+       selectattr('ssl_enabled') | map(attribute='ssl_key_path') | list }}
+  register: nginx_tls_files
+
+- name: Reject missing TLS certificate files
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "TLS certificate or key is missing: {{ item.item }}"
+  loop: "{{ nginx_tls_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Create Nginx configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+    - "{{ nginx_proxy_params_path | dirname }}"
+    - "{{ nginx_websocket_map_path | dirname }}"
+  tags:
+    - preparing
+
+- name: Template role-owned proxy headers
+  ansible.builtin.template:
+    src: proxy_params.j2
+    dest: "{{ nginx_proxy_params_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify: Reload nginx_setup Nginx
+
+- name: Template role-owned WebSocket map
+  ansible.builtin.template:
+    src: websocket_map.conf.j2
+    dest: "{{ nginx_websocket_map_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify: Reload nginx_setup Nginx
+
+- name: Template Nginx sites
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: "/etc/nginx/sites-available/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  loop: "{{ nginx_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload nginx_setup Nginx
+
+- name: Enable managed Nginx sites
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ item.name }}"
+    dest: "/etc/nginx/sites-enabled/{{ item.name }}"
+    state: link
+    owner: root
+    group: root
+  loop: "{{ nginx_sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload nginx_setup Nginx
+
+- name: Validate complete Nginx configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ nginx_binary }}"
+      - -t
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Enable and start Nginx
+  ansible.builtin.service:
+    name: "{{ nginx_service_name }}"
+    state: started
+    enabled: true
+
+- name: Apply validated Nginx configuration
+  ansible.builtin.meta: flush_handlers

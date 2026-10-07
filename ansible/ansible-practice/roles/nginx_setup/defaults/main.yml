@@ -1,3 +1,33 @@
 ---
-# Default variables for Nginx setup
-# No user-configurable variables are required for this role.
+# Default variables for host Nginx setup (Debian and Ubuntu).
+
+# Nginx package installed from the distribution repository.
+nginx_package_name: nginx
+
+# System service managed by this role.
+nginx_service_name: nginx
+
+# Nginx executable used for configuration validation.
+nginx_binary: /usr/sbin/nginx
+
+# Time in seconds before refreshing the APT cache.
+nginx_apt_cache_valid_time: 3600
+
+# Role-owned proxy header snippet; distribution proxy_params is preserved.
+nginx_proxy_params_path: /etc/nginx/snippets/nginx-setup-proxy-params.conf
+
+# Role-owned HTTP-context WebSocket map, loaded by the distribution nginx.conf.
+nginx_websocket_map_path: /etc/nginx/conf.d/nginx-setup-websocket-map.conf
+
+# Default maximum request body size; individual sites can override it.
+nginx_client_max_body_size: "16M"
+
+# Default proxy read timeout, including idle WebSocket connections.
+nginx_proxy_read_timeout: "60s"
+
+# Named sites to manage; an empty list installs Nginx without adding routes.
+# nginx_sites:
+#   - name: app.conf
+#     server_name: app.example.com
+#     proxy_pass: http://127.0.0.1:8080
+nginx_sites: []

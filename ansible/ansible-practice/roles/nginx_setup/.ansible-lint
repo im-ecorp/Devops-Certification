@@ -1,0 +1,4 @@
+---
+# House style uses a service prefix (nginx_*), not the role's _setup suffix.
+skip_list:
+  - var-naming[no-role-prefix]

@@ -1,2 +1,12 @@
 ---
-# tasks file for nginx
+- name: Install Nginx
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_nginx
+    - setup_nginx
+
+- name: Configure Nginx
+  ansible.builtin.import_tasks: configuration.yml
+  tags:
+    - configure_nginx
+    - setup_nginx
