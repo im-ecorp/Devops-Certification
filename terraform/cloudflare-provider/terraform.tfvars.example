@@ -1,0 +1,8 @@
+# Real values go in terraform.tfvars (ignored by git).
+# Replace these with your real Cloudflare Zone ID and domain.
+zone_id      = "00000000000000000000000000000000"
+domain       = "example.com"
+ipv4_address = "192.0.2.10"
+ttl          = 300
+
+# Do not put the API token here. Use: export CLOUDFLARE_API_TOKEN="your-token"
