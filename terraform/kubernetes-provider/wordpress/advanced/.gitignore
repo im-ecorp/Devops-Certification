@@ -1,0 +1,10 @@
+# Keep .terraform.lock.hcl tracked for reproducible provider selections.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+*.tfplan.json

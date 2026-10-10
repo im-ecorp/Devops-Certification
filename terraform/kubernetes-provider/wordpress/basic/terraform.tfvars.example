@@ -1,0 +1,2 @@
+# kube_context = "your-practice-cluster-context-name"
+# Do not store db_password here if committing to git.
