@@ -1,0 +1,6 @@
+project_name = "tf-docker-practice"
+wordpress_port = 8080
+# docker_host = "unix:///var/run/docker.sock"
+# Set image digests if exact reproducibility is required.
+wordpress_image = "wordpress:php8.3-apache"
+database_image = "mariadb:11.4"
