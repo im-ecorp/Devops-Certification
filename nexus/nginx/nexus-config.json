@@ -1,0 +1,579 @@
+{
+  "delete_repositories_opt_in": [
+    "maven-snapshots",
+    "maven-public",
+    "maven-central",
+    "maven-releases",
+    "nuget-hosted",
+    "nuget-group",
+    "nuget.org-proxy"
+  ],
+  "blob_stores": [
+    {
+      "name": "apt",
+      "path": "apt"
+    },
+    {
+      "name": "docker",
+      "path": "docker"
+    },
+    {
+      "name": "raw",
+      "path": "raw"
+    }
+  ],
+  "cleanup_policies": [
+    {
+      "name": "apt",
+      "format": "apt",
+      "notes": "",
+      "criteriaLastBlobUpdated": 30,
+      "criteriaLastDownloaded": 90
+    },
+    {
+      "name": "docker",
+      "format": "docker",
+      "notes": "",
+      "criteriaLastBlobUpdated": 30,
+      "criteriaLastDownloaded": 90
+    },
+    {
+      "name": "raw",
+      "format": "raw",
+      "notes": "",
+      "criteriaLastBlobUpdated": 30,
+      "criteriaLastDownloaded": 90
+    },
+    {
+      "name": "pypi",
+      "format": "pypi",
+      "notes": "",
+      "criteriaLastBlobUpdated": 30,
+      "criteriaLastDownloaded": 90
+    }
+  ],
+  "repositories": [
+    {
+      "format": "apt",
+      "body": {
+        "name": "ubuntu",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "http://archive.ubuntu.com/ubuntu/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "focal,focal-updates,focal-backports,jammy,jammy-updates,jammy-backports,noble,noble-updates,noble-backports",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "apt",
+      "body": {
+        "name": "ubuntu-security",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "http://security.ubuntu.com/ubuntu/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "focal-security,jammy-security,noble-security",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "apt",
+      "body": {
+        "name": "ubuntu-docker",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://download.docker.com/linux/ubuntu",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "focal,jammy,noble",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "apt",
+      "body": {
+        "name": "debian",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "http://deb.debian.org/debian/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "bullseye,bullseye-updates,bullseye-backports,bookworm,bookworm-updates,bookworm-backports,trixie,trixie-updates,trixie-backports",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "apt",
+      "body": {
+        "name": "debian-security",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "http://security.debian.org/debian-security/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "bullseye-security,bookworm-security,trixie-security",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "apt",
+      "body": {
+        "name": "debian-docker",
+        "online": true,
+        "storage": {
+          "blobStoreName": "apt",
+          "strictContentTypeValidation": true,
+          "writePolicy": "ALLOW_ONCE"
+        },
+        "cleanup": {
+          "policyNames": [
+            "apt"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://download.docker.com/linux/debian/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440,
+          "assetMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "apt": {
+          "distribution": "bullseye,bookworm,trixie",
+          "flat": false
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "hub",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://hub.hamdocker.ir",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9091
+        },
+        "dockerProxy": {
+          "indexType": "HUB"
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "quay",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://quay.io/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9092
+        },
+        "dockerProxy": {
+          "indexType": "REGISTRY"
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "k8s",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://registry.k8s.io",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9093
+        },
+        "dockerProxy": {
+          "indexType": "REGISTRY"
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "gcr",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://gcr.io",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9094
+        },
+        "dockerProxy": {
+          "indexType": "REGISTRY"
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "k8s-gcr",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://k8s.gcr.io",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9095
+        },
+        "dockerProxy": {
+          "indexType": "REGISTRY"
+        }
+      }
+    },
+    {
+      "format": "docker",
+      "body": {
+        "name": "github",
+        "online": true,
+        "storage": {
+          "blobStoreName": "docker",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "docker"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://ghcr.io",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "docker": {
+          "v1Enabled": true,
+          "forceBasicAuth": false,
+          "httpPort": 9096
+        },
+        "dockerProxy": {
+          "indexType": "REGISTRY"
+        }
+      }
+    },
+    {
+      "format": "raw",
+      "body": {
+        "name": "kube",
+        "online": true,
+        "storage": {
+          "blobStoreName": "raw",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "raw"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://files.m.daocloud.io",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        },
+        "raw": {
+          "contentDisposition": "INLINE"
+        }
+      }
+    },
+    {
+      "format": "pypi",
+      "body": {
+        "name": "pypi",
+        "online": true,
+        "storage": {
+          "blobStoreName": "raw",
+          "strictContentTypeValidation": true
+        },
+        "cleanup": {
+          "policyNames": [
+            "pypi"
+          ]
+        },
+        "proxy": {
+          "remoteUrl": "https://pypi.org/",
+          "contentMaxAge": 1440,
+          "metadataMaxAge": 1440
+        },
+        "negativeCache": {
+          "enabled": true,
+          "timeToLive": 1440
+        },
+        "httpClient": {
+          "blocked": false,
+          "autoBlock": true
+        }
+      }
+    }
+  ],
+  "anonymous": {
+    "enabled": true,
+    "userId": "anonymous",
+    "realmName": "NexusAuthorizingRealm"
+  },
+  "realms": [
+    "DockerToken"
+  ],
+  "role": {
+    "id": "nx-deploy",
+    "name": "nx-deploy",
+    "description": "Deployment role with read and write access",
+    "privileges": [
+      "nx-repository-view-*-*-*"
+    ],
+    "roles": [
+      "nx-anonymous"
+    ]
+  },
+  "user": {
+    "userId": "deploy",
+    "firstName": "Deploy",
+    "lastName": "User",
+    "emailAddress": "deploy@example.com",
+    "status": "active",
+    "roles": [
+      "nx-deploy"
+    ]
+  }
+}

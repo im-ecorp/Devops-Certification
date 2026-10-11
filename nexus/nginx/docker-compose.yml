@@ -1,0 +1,48 @@
+services:
+
+  # Sonatype Nexus Repository Manager (Standalone Nginx Setup)
+  nexus:
+    image: sonatype/nexus3:${NEXUS_IMAGE_TAG:-3.94.1}
+    container_name: nexus
+    hostname: nexus
+    restart: ${RESTART_POLICY:-always}
+    volumes:
+      - nexus_data:/nexus-data
+    networks:
+      - app_net
+    environment:
+      NEXUS_SECURITY_RANDOMPASSWORD: "false"
+      NEXUS_SECURITY_INITIAL_PASSWORD: ${NEXUS_ADMIN_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/service/rest/v1/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # Nginx replaces the Traefik labels and shares Nexus's private Docker network.
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: nexus-nginx
+    restart: ${RESTART_POLICY:-always}
+    depends_on:
+      nexus:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf.d/nexus.conf:/etc/nginx/conf.d/nexus.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    name: app_net
+    external: true
+
+volumes:
+  nexus_data:
+    name: nexus_data
+    external: false
