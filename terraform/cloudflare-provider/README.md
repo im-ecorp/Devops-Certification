@@ -2,6 +2,21 @@
 
 Learn the Terraform lifecycle by managing diverse DNS records (A, CNAME, TXT, MX) in an existing Cloudflare zone. 
 
+## Local Checks (No Cloudflare Credentials)
+
+Requires Terraform **>= 1.7 and < 2.0**. Run from this directory:
+
+```bash
+terraform fmt -check
+terraform init -backend=false
+terraform validate
+terraform test
+```
+
+The test uses a mocked Cloudflare provider and a plan-only run. It checks record configuration without contacting Cloudflare or creating DNS records; it does not verify your real token or zone. Initialization still downloads the provider.
+
+For live practice, use unused `tf-*` names in a practice zone. The default `192.0.2.10` is a documentation-only IP, not a working server. Keep state, local tfvars, and saved plans out of Git; commit `.terraform.lock.hcl`.
+
 ## 1. Real Test Setup (Using a Real API Token & Domain)
 
 To apply this to a real Cloudflare account, you need:
