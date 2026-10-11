@@ -1,0 +1,6 @@
+# Writable state from individual practice labs
+**/logs/
+**/temp/
+**/cache/
+**/__pycache__/
+*.pyc
