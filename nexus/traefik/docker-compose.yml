@@ -27,11 +27,11 @@ services:
       - "traefik.http.middlewares.nexus-https.redirectscheme.permanent=true"
 
       # Nexus Main UI / API / APT / Raw / PyPI (Port 8081)
-      - "traefik.http.routers.http-repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.example.com}`)"
       - "traefik.http.routers.http-repo.entrypoints=web"
       - "traefik.http.routers.http-repo.service=repo"
       - "traefik.http.routers.http-repo.middlewares=nexus-https"
-      - "traefik.http.routers.repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.w.k8sforfun.com}`)"
+      - "traefik.http.routers.repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.example.com}`)"
       - "traefik.http.routers.repo.entrypoints=web-secure"
       - "traefik.http.routers.repo.tls=true"
       - "traefik.http.routers.repo.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -39,11 +39,11 @@ services:
       - "traefik.http.services.repo.loadBalancer.server.port=8081"
 
       # Docker Repository: hub (Port 9091)
-      - "traefik.http.routers.http-hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.example.com}`)"
       - "traefik.http.routers.http-hub.entrypoints=web"
       - "traefik.http.routers.http-hub.service=hub"
       - "traefik.http.routers.http-hub.middlewares=nexus-https"
-      - "traefik.http.routers.hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.w.k8sforfun.com}`)"
+      - "traefik.http.routers.hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.example.com}`)"
       - "traefik.http.routers.hub.entrypoints=web-secure"
       - "traefik.http.routers.hub.tls=true"
       - "traefik.http.routers.hub.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -51,11 +51,11 @@ services:
       - "traefik.http.services.hub.loadBalancer.server.port=9091"
 
       # Docker Repository: quay (Port 9092)
-      - "traefik.http.routers.http-quay.rule=Host(`${NEXUS_QUAY_DOMAIN:-quay.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-quay.rule=Host(`${NEXUS_QUAY_DOMAIN:-quay.example.com}`)"
       - "traefik.http.routers.http-quay.entrypoints=web"
       - "traefik.http.routers.http-quay.service=quay"
       - "traefik.http.routers.http-quay.middlewares=nexus-https"
-      - "traefik.http.routers.quay.rule=Host(`${NEXUS_QUAY_DOMAIN:-quay.w.k8sforfun.com}`)"
+      - "traefik.http.routers.quay.rule=Host(`${NEXUS_QUAY_DOMAIN:-quay.example.com}`)"
       - "traefik.http.routers.quay.entrypoints=web-secure"
       - "traefik.http.routers.quay.tls=true"
       - "traefik.http.routers.quay.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -63,11 +63,11 @@ services:
       - "traefik.http.services.quay.loadBalancer.server.port=9092"
 
       # Docker Repository: k8s (Port 9093)
-      - "traefik.http.routers.http-k8s.rule=Host(`${NEXUS_K8S_DOMAIN:-k8s.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-k8s.rule=Host(`${NEXUS_K8S_DOMAIN:-k8s.example.com}`)"
       - "traefik.http.routers.http-k8s.entrypoints=web"
       - "traefik.http.routers.http-k8s.service=k8s"
       - "traefik.http.routers.http-k8s.middlewares=nexus-https"
-      - "traefik.http.routers.k8s.rule=Host(`${NEXUS_K8S_DOMAIN:-k8s.w.k8sforfun.com}`)"
+      - "traefik.http.routers.k8s.rule=Host(`${NEXUS_K8S_DOMAIN:-k8s.example.com}`)"
       - "traefik.http.routers.k8s.entrypoints=web-secure"
       - "traefik.http.routers.k8s.tls=true"
       - "traefik.http.routers.k8s.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -75,11 +75,11 @@ services:
       - "traefik.http.services.k8s.loadBalancer.server.port=9093"
 
       # Docker Repository: gcr (Port 9094)
-      - "traefik.http.routers.http-gcr.rule=Host(`${NEXUS_GCR_DOMAIN:-gcr.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-gcr.rule=Host(`${NEXUS_GCR_DOMAIN:-gcr.example.com}`)"
       - "traefik.http.routers.http-gcr.entrypoints=web"
       - "traefik.http.routers.http-gcr.service=gcr"
       - "traefik.http.routers.http-gcr.middlewares=nexus-https"
-      - "traefik.http.routers.gcr.rule=Host(`${NEXUS_GCR_DOMAIN:-gcr.w.k8sforfun.com}`)"
+      - "traefik.http.routers.gcr.rule=Host(`${NEXUS_GCR_DOMAIN:-gcr.example.com}`)"
       - "traefik.http.routers.gcr.entrypoints=web-secure"
       - "traefik.http.routers.gcr.tls=true"
       - "traefik.http.routers.gcr.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -87,11 +87,11 @@ services:
       - "traefik.http.services.gcr.loadBalancer.server.port=9094"
 
       # Docker Repository: k8s-gcr (Port 9095)
-      - "traefik.http.routers.http-k8s-gcr.rule=Host(`${NEXUS_K8S_GCR_DOMAIN:-k8s-gcr.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-k8s-gcr.rule=Host(`${NEXUS_K8S_GCR_DOMAIN:-k8s-gcr.example.com}`)"
       - "traefik.http.routers.http-k8s-gcr.entrypoints=web"
       - "traefik.http.routers.http-k8s-gcr.service=k8s-gcr"
       - "traefik.http.routers.http-k8s-gcr.middlewares=nexus-https"
-      - "traefik.http.routers.k8s-gcr.rule=Host(`${NEXUS_K8S_GCR_DOMAIN:-k8s-gcr.w.k8sforfun.com}`)"
+      - "traefik.http.routers.k8s-gcr.rule=Host(`${NEXUS_K8S_GCR_DOMAIN:-k8s-gcr.example.com}`)"
       - "traefik.http.routers.k8s-gcr.entrypoints=web-secure"
       - "traefik.http.routers.k8s-gcr.tls=true"
       - "traefik.http.routers.k8s-gcr.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"
@@ -99,11 +99,11 @@ services:
       - "traefik.http.services.k8s-gcr.loadBalancer.server.port=9095"
 
       # Docker Repository: github (Port 9096)
-      - "traefik.http.routers.http-github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.w.k8sforfun.com}`)"
+      - "traefik.http.routers.http-github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.example.com}`)"
       - "traefik.http.routers.http-github.entrypoints=web"
       - "traefik.http.routers.http-github.service=github"
       - "traefik.http.routers.http-github.middlewares=nexus-https"
-      - "traefik.http.routers.github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.w.k8sforfun.com}`)"
+      - "traefik.http.routers.github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.example.com}`)"
       - "traefik.http.routers.github.entrypoints=web-secure"
       - "traefik.http.routers.github.tls=true"
       - "traefik.http.routers.github.tls.certresolver=${TRAEFIK_CERTRESOLVER:-myproduction}"

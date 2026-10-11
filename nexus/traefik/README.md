@@ -52,12 +52,12 @@ existing configured volume must create those repositories first.
 
 ```bash
 # Offline preview; no credentials or network needed.
-python3 setup-nexus.py --url https://repo.w.k8sforfun.com
+python3 setup-nexus.py --url https://repo.example.com
 
 # Creates missing objects, enables anonymous access and DockerToken, creates nx-deploy.
 # Prompts securely for the actual admin password and deploy user password.
 # Empty deploy password skips user creation.
-python3 setup-nexus.py --url https://repo.w.k8sforfun.com --wait 300 --apply
+python3 setup-nexus.py --url https://repo.example.com --wait 300 --apply
 ```
 
 Use the hostname configured for your deployment, with a trusted certificate.
@@ -83,15 +83,15 @@ warnings in the parent README before using an existing volume.
 ```bash
 docker compose ps
 docker compose logs -f nexus
-curl --fail https://repo.w.k8sforfun.com/service/rest/v1/status
-curl -i https://hub.w.k8sforfun.com/v2/
+curl --fail https://repo.example.com/service/rest/v1/status
+curl -i https://hub.example.com/v2/
 ```
 
 A registry may return `200` or an authentication challenge (`401`); neither proves
 upstream image retrieval. Test an actual pull after bootstrap:
 
 ```bash
-docker pull hub.w.k8sforfun.com/library/alpine:3.22
+docker pull hub.example.com/library/alpine:3.22
 ```
 
 After approving an image update, validate Compose, pull, and use `docker compose up -d`.

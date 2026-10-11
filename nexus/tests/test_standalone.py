@@ -60,11 +60,11 @@ with open(sys.argv[1]) as f:
     data = yaml.safe_load(f)
 labels = data['services']['nexus']['labels']
 assert 'traefik.enable=true' in labels
-assert 'traefik.http.routers.repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.w.k8sforfun.com}`)' in labels
+assert 'traefik.http.routers.repo.rule=Host(`${NEXUS_MAIN_DOMAIN:-repo.example.com}`)' in labels
 assert 'traefik.http.services.repo.loadBalancer.server.port=8081' in labels
-assert 'traefik.http.routers.hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.w.k8sforfun.com}`)' in labels
+assert 'traefik.http.routers.hub.rule=Host(`${NEXUS_HUB_DOMAIN:-hub.example.com}`)' in labels
 assert 'traefik.http.services.hub.loadBalancer.server.port=9091' in labels
-assert 'traefik.http.routers.github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.w.k8sforfun.com}`)' in labels
+assert 'traefik.http.routers.github.rule=Host(`${NEXUS_GITHUB_DOMAIN:-github.example.com}`)' in labels
 assert 'traefik.http.services.github.loadBalancer.server.port=9096' in labels
 print("TRAEFIK_LABELS_OK")
 '''

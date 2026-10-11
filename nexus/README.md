@@ -13,7 +13,7 @@ Each directory includes `docker-compose.yml`, `.env.example`, `nexus-config.json
 
 - Nexus `sonatype/nexus3:3.94.1`, container/hostname `nexus`, restart policy `always`.
 - Named volume `nexus_data` mounted at `/nexus-data`; original readiness check and timings.
-- Main domain from inventory: `w.k8sforfun.com`. Change hostnames for another deployment.
+- Placeholder main domain: `example.com`. Replace it with your domain before deployment.
 - Three file blob stores: `apt`, `docker`, `raw`.
 - Four cleanup policies: `apt`, `docker`, `raw`, `pypi`, with 30-day last-update and 90-day last-download criteria.
 - Six APT proxies: `ubuntu`, `ubuntu-security`, `ubuntu-docker`, `debian`, `debian-security`, `debian-docker`.
@@ -24,13 +24,13 @@ Each directory includes `docker-compose.yml`, `.env.example`, `nexus-config.json
 
 | Public hostname | Nexus port | Purpose |
 | --- | ---: | --- |
-| `repo.w.k8sforfun.com` | 8081 | UI, REST API, APT, Raw, PyPI |
-| `hub.w.k8sforfun.com` | 9091 | `https://hub.hamdocker.ir` |
-| `quay.w.k8sforfun.com` | 9092 | `https://quay.io/` |
-| `k8s.w.k8sforfun.com` | 9093 | `https://registry.k8s.io` |
-| `gcr.w.k8sforfun.com` | 9094 | `https://gcr.io` |
-| `k8s-gcr.w.k8sforfun.com` | 9095 | `https://k8s.gcr.io` |
-| `github.w.k8sforfun.com` | 9096 | `https://ghcr.io` |
+| `repo.example.com` | 8081 | UI, REST API, APT, Raw, PyPI |
+| `hub.example.com` | 9091 | `https://hub.hamdocker.ir` |
+| `quay.example.com` | 9092 | `https://quay.io/` |
+| `k8s.example.com` | 9093 | `https://registry.k8s.io` |
+| `gcr.example.com` | 9094 | `https://gcr.io` |
+| `k8s-gcr.example.com` | 9095 | `https://k8s.gcr.io` |
+| `github.example.com` | 9096 | `https://ghcr.io` |
 
 ## Intentional adaptations
 
