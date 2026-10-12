@@ -1,0 +1,72 @@
+name: todo-app-lab
+
+services:
+  app:
+    image: todo-app-lab:55680777bc46
+    build:
+      context: ./upstream
+      dockerfile: ../Dockerfile
+      target: final
+    init: true
+    user: node
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      MYSQL_HOST: db
+      MYSQL_USER: todo
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/init-env.sh first}
+      MYSQL_DB: todos
+    ports:
+      - "127.0.0.1:8092:3000"
+    networks: [web, database]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/api/items', r => { let b = ''; r.on('data', d => b += d); r.on('end', () => { try { process.exit(r.statusCode === 200 && Array.isArray(JSON.parse(b)) ? 0 : 1); } catch { process.exit(1); } }); }).on('error', () => process.exit(1));"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    pids_limit: 256
+    mem_limit: 512m
+
+  db:
+    image: mysql:8.4.8@sha256:2952e3be7807f06fc18de50b3ea1a632d5c70d63482ff7d7376fe3aa8999babf
+    environment:
+      MYSQL_DATABASE: todos
+      MYSQL_USER: todo
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/init-env.sh first}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run scripts/init-env.sh first}
+    volumes:
+      - todo-db-data:/var/lib/mysql
+    networks: [database]
+    healthcheck:
+      # TCP + application credentials: unlike mysqladmin ping this verifies
+      # initialization, database creation, and authentication, not just a PID.
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" >/dev/null']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    pids_limit: 256
+    mem_limit: 1g
+
+networks:
+  web:
+  database:
+    internal: true
+
+volumes:
+  todo-db-data:

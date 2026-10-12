@@ -1,0 +1,6 @@
+.env
+*.local
+.validation.local/
+.node_modules/
+originals/
+node_modules/
