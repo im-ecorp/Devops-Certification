@@ -1,0 +1,2 @@
+# Local editing snapshots; never publish old README/validation copies.
+*.pre-*.bak
