@@ -1,0 +1,12 @@
+{
+  "name": "docker-nodejs-learning-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Small Express API for Dockerfile practice",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=24 <25" },
+  "dependencies": { "express": "5.1.0" }
+}
