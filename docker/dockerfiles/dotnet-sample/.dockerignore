@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.git/
+.env
+.env.*
+README.md
+test_http.py
+__pycache__/
+core
+core.*
