@@ -12,6 +12,7 @@ Hands-on infrastructure practice with independent **Terraform**, **Nginx**, **Ap
 | [`nginx/`](nginx/README.md) | Seven loopback-only reverse/forward proxy, caching, and load-balancing configs |
 | [`apache/`](apache/README.md) | Loopback-only reverse and forward proxy virtual-host snippets |
 | [`nexus/`](nexus/README.md) | Standalone Nexus Compose alternatives with Traefik or Nginx |
+| [`podman/`](podman/README.md) | Brief rootless installation/configuration guide and a local [Nginx example](podman/nginx/README.md) |
 | [`vagrant/`](vagrant/Vagrantfile) | Three-node Debian 13 VirtualBox cluster |
 
 ## Tech Stack
