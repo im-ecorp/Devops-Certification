@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.validation/
+node_modules/
+__pycache__/
+*.pyc
+bin/
+obj/
+*.log
+*.cookies

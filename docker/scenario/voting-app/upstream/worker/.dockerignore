@@ -1,0 +1,4 @@
+# Lab addition: keep host SDK outputs out of the source image build.
+bin/
+obj/
+*.log

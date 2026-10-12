@@ -1,0 +1,101 @@
+# Local learning lab derived from upstream/docker-compose.yml; see UPSTREAM.md.
+name: voting-lab
+
+services:
+  vote:
+    build:
+      context: ./upstream/vote
+      target: final
+    environment:
+      OPTION_A: Cats
+      OPTION_B: Dogs
+    ports:
+      - "127.0.0.1:8093:80"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - front-tier
+      - back-tier
+
+  result:
+    build:
+      context: ./upstream/result
+    ports:
+      - "127.0.0.1:8094:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - front-tier
+      - back-tier
+
+  worker:
+    build:
+      context: ./upstream/worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - back-tier
+
+  redis:
+    image: redis:8.2-alpine
+    # Pending votes are deliberately ephemeral; only Postgres is persisted.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(redis-cli ping)\" = PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - back-tier
+
+  db:
+    image: postgres:15-alpine
+    # Public upstream DEMO credentials, not production secrets. Both clients
+    # hardcode these; unsupported password environment overrides would break them.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "test \"$$(PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -tAc 'SELECT 1')\" = 1"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - back-tier
+
+volumes:
+  db-data:
+
+networks:
+  front-tier:
+  back-tier:
+    internal: true
