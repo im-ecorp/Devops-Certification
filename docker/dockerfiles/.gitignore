@@ -1,0 +1,6 @@
+# Host-side checks and local Flask setup
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
