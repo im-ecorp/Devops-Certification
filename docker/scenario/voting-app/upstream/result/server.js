@@ -1,5 +1,6 @@
+// Lab refactor: pool-managed queries release clients; each poll completes before the next.
 var express = require('express'),
-    async = require('async'),
+    path = require('node:path'),
     { Pool } = require('pg'),
     cookieParser = require('cookie-parser'),
     app = express(),
@@ -21,27 +22,15 @@ var pool = new Pool({
   connectionString: 'postgres://postgres:postgres@db/postgres'
 });
 
-async.retry(
-  {times: 1000, interval: 1000},
-  function(callback) {
-    pool.connect(function(err, client, done) {
-      if (err) {
-        console.error("Waiting for db");
-      }
-      callback(err, client);
-    });
-  },
-  function(err, client) {
-    if (err) {
-      return console.error("Giving up");
-    }
-    console.log("Connected to db");
-    getVotes(client);
-  }
-);
+// Connection attempts and query errors use the same retry path, including a missing table
+// while the worker initializes it. Pool.query checks out and releases a client per query.
+pool.on('error', function (err) {
+  console.error('Idle database connection error: ' + err.message);
+});
+getVotes();
 
-function getVotes(client) {
-  client.query('SELECT vote, COUNT(id) AS count FROM votes GROUP BY vote', [], function(err, result) {
+function getVotes() {
+  pool.query('SELECT vote, COUNT(id) AS count FROM votes GROUP BY vote', [], function(err, result) {
     if (err) {
       console.error("Error performing query: " + err);
     } else {
@@ -49,7 +38,7 @@ function getVotes(client) {
       io.sockets.emit("scores", JSON.stringify(votes));
     }
 
-    setTimeout(function() {getVotes(client) }, 1000);
+    setTimeout(getVotes, 1000);
   });
 }
 
@@ -64,7 +53,7 @@ function collectVotesFromResult(result) {
 }
 
 app.use(cookieParser());
-app.use(express.urlencoded());
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static(__dirname + '/views'));
 
 app.get('/', function (req, res) {

@@ -7,11 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Lab modification: current Redis 2.x line removes vulnerable transitives. -->
     <PackageReference Include="StackExchange.Redis" Version="2.13.17" />
-    <!-- Lab modification: patched Npgsql 4.1 line; preserve API compatibility. -->
-    <PackageReference Include="Npgsql" Version="4.1.14" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <!-- Lab refactor: current Npgsql 10 API on the .NET 10 runtime. -->
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>

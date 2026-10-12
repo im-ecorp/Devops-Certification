@@ -1,6 +1,6 @@
 # Voting app: source-based Compose lab
 
-A local Docker Compose exercise based on [Docker's example-voting-app](https://github.com/dockersamples/example-voting-app). The complete exported source lives in [`upstream/`](upstream/), with revision, license, and modifications in [`UPSTREAM.md`](UPSTREAM.md). Use **this directory's `compose.yaml`**, not `upstream/docker-compose.yml` (a development/debug configuration).
+A local Docker Compose exercise based on [Docker's example-voting-app](https://github.com/dockersamples/example-voting-app). The maintained source subset lives in [`upstream/`](upstream/), with revision, license, and modifications in [`UPSTREAM.md`](UPSTREAM.md). Use **this directory's `compose.yaml`**, the superseded upstream development/debug configuration was removed.
 
 ## Architecture
 
@@ -33,7 +33,7 @@ Open <http://localhost:8093> to vote and <http://localhost:8094> to see results.
 
 ## Configuration and security boundary
 
-Change the sample choices in `compose.yaml` via `OPTION_A` and `OPTION_B` on the vote service; the upstream Python source reads these variables. Keep them mapped to the two choices `a` and `b` in the UI. The container images are built from `upstream/vote` (final stage), `upstream/result`, and `upstream/worker`; there are no development source bind mounts or exposed Node inspector. `redis:8.2-alpine` and `postgres:15-alpine` are major/minor family tags, not immutable digests. Python 3.11 slim, Node 24 slim, and .NET 10 SDK/runtime come from Dockerfile family tags; dependency manifests originate upstream (Python requirements are unpinned), with targeted worker package patches and a compatible Node lock refresh documented in `UPSTREAM.md`. Review/update image patches and dependencies when reusing this lab. See [VALIDATION.md](VALIDATION.md) for daemon-free checks performed and remaining Docker-host tests.
+Change the sample choices in `compose.yaml` via `OPTION_A` and `OPTION_B` on the vote service; the upstream Python source reads these variables. Keep them mapped to the two choices `a` and `b` in the UI. The container images are built from `upstream/vote` (final stage), `upstream/result`, and `upstream/worker`; there are no development source bind mounts or exposed Node inspector. `redis:8.2-alpine` and `postgres:15-alpine` are major/minor family tags, not immutable digests. Python 3.11 slim, Node 24 slim, and .NET 10 SDK/runtime come from Dockerfile family tags; dependency manifests originate upstream (Python requirements are unpinned), with the worker async/upsert refactor, Npgsql 10.0.3/Newtonsoft.Json 13.0.4, and a compatible Node lock refresh documented in `UPSTREAM.md`. Review/update image patches and dependencies when reusing this lab. See [VALIDATION.md](VALIDATION.md) for daemon-free checks performed and remaining Docker-host tests.
 
 **Local demo only.** Both upstream clients hardcode the public `postgres/postgres` database login in `upstream/worker/Program.cs` and `upstream/result/server.js`. Compose sets the matching `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`; changing a Compose variable or adding `.env` alone will **break connectivity**. The credentials are not secrets and cannot be secured by Compose interpolation without source changes to both clients. For anything beyond an isolated lab, refactor both applications to consume a protected secret, rotate database credentials with a deliberate migration, add authentication/TLS and robust health checks, audit dependencies, and back up Postgres. Loopback publishing is not authentication; local processes can access both web endpoints. Cookies are not secure voting identity. Redis is not persisted, so queued votes can be lost on restart; the worker uses a basic pop-then-write flow without delivery guarantees. This app is for Compose learning, not elections or production traffic.
 
@@ -48,6 +48,21 @@ docker compose exec db psql -U postgres -d postgres -c 'SELECT vote, COUNT(*) FR
 ```
 
 Expected: the selected option's count becomes visible on the result page and the SQL query shows a matching row. Browser cookies identify repeat votes: submitting again from the same browser **changes** its selection, rather than adding a second row. To test a new voter, use a fresh private browser profile. The sample has no separate automated end-to-end test for this stack.
+
+## Source regression checks
+
+With Node 24 and .NET SDK 10 installed, run from this directory:
+
+```bash
+(cd upstream/result && npm ci --ignore-scripts && node --test test/server.test.js)
+dotnet build upstream/worker/Worker.csproj -c Release
+dotnet run --project upstream/worker/tests/Worker.Tests.csproj
+python3 validate.py docker compose
+```
+
+The Node tests exercise the real HTTP route with PostgreSQL and Socket.IO replaced only at the external boundary. The worker harness checks parameter binding/upsert, cancellation, valid-message processing, and malformed JSON handling without a database. These are not container or end-to-end tests. [VALIDATION.md](VALIDATION.md) records the actual results.
+
+The result server now releases pooled connections per query and retries polling without overlap. The worker uses async I/O, skips malformed messages, and performs a parameterized atomic upsert. Demo credentials/schema and ports remain unchanged. The bundled AngularJS UI remains end-of-life; this refactor does not make the demo production-ready.
 
 ## Stop and clean up
 

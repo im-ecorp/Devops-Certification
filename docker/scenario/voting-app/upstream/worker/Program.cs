@@ -1,9 +1,7 @@
 using System;
 using System.Data.Common;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Npgsql;
 using StackExchange.Redis;
@@ -12,143 +10,160 @@ namespace Worker
 {
     public class Program
     {
-        public static int Main(string[] args)
+        private const string DatabaseConnection = "Host=db;Username=postgres;Password=postgres;";
+        private const string RedisHost = "redis";
+
+        public static async Task<int> Main(string[] args)
         {
+            using var shutdown = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; shutdown.Cancel(); };
             try
             {
-                var pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
-                var redisConn = OpenRedisConnection("redis");
-                var redis = redisConn.GetDatabase();
-
-                // Keep alive is not implemented in Npgsql yet. This workaround was recommended:
-                // https://github.com/npgsql/npgsql/issues/1214#issuecomment-235828359
-                var keepAliveCommand = pgsql.CreateCommand();
-                keepAliveCommand.CommandText = "SELECT 1";
-
-                var definition = new { vote = "", voter_id = "" };
-                while (true)
-                {
-                    // Slow down to prevent CPU spike, only query each 100ms
-                    Thread.Sleep(100);
-
-                    // Reconnect redis if down
-                    if (redisConn == null || !redisConn.IsConnected) {
-                        Console.WriteLine("Reconnecting Redis");
-                        redisConn = OpenRedisConnection("redis");
-                        redis = redisConn.GetDatabase();
-                    }
-                    string json = redis.ListLeftPopAsync("votes").Result;
-                    if (json != null)
-                    {
-                        var vote = JsonConvert.DeserializeAnonymousType(json, definition);
-                        Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
-                        // Reconnect DB if down
-                        if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
-                        {
-                            Console.WriteLine("Reconnecting DB");
-                            pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
-                        }
-                        else
-                        { // Normal +1 vote requested
-                            UpdateVote(pgsql, vote.voter_id, vote.vote);
-                        }
-                    }
-                    else
-                    {
-                        keepAliveCommand.ExecuteNonQuery();
-                    }
-                }
+                await RunAsync(shutdown.Token);
+                return 0;
+            }
+            catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+            {
+                return 0;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(ex.ToString());
+                Console.Error.WriteLine(ex);
                 return 1;
             }
         }
 
-        private static NpgsqlConnection OpenDbConnection(string connectionString)
+        private static async Task RunAsync(CancellationToken token)
         {
-            NpgsqlConnection connection;
+            using var connection = new NpgsqlConnection(DatabaseConnection);
+            await OpenDatabaseAsync(connection, token);
+            using var redisConnection = await OpenRedisAsync(token);
+            var redis = redisConnection.GetDatabase();
+            await RunVoteLoopAsync(
+                async cancellation => (string)await redis.ListLeftPopAsync("votes").WaitAsync(cancellation),
+                async (id, vote, cancellation) =>
+                {
+                    if (connection.State != System.Data.ConnectionState.Open)
+                        await OpenDatabaseAsync(connection, cancellation);
+                    using var command = CreateVoteCommand(connection, id, vote);
+                    await command.ExecuteNonQueryAsync(cancellation);
+                }, Console.Error.WriteLine, token);
+        }
 
+        // Only the external read/write boundary is injected; parsing, retries and cancellation
+        // are the same code used by the real worker and the database-free tests.
+        public static async Task RunVoteLoopAsync(
+            Func<CancellationToken, Task<string>> read,
+            Func<string, string, CancellationToken, Task> write,
+            Action<string> log, CancellationToken token)
+        {
+            var definition = new { vote = "", voter_id = "" };
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                // Redis pop is not transactional with Postgres; this remains a demo queue.
+                string json;
+                try
+                {
+                    json = await read(token);
+                }
+                catch (RedisException ex)
+                {
+                    log($"Redis unavailable: {ex.Message}");
+                    await Task.Delay(1000, token);
+                    continue; // Multiplexer reconnects in the background.
+                }
+
+                if (json == null)
+                {
+                    await Task.Delay(100, token);
+                    continue;
+                }
+
+                try
+                {
+                var vote = JsonConvert.DeserializeAnonymousType(json, definition);
+                if (vote == null || string.IsNullOrEmpty(vote.voter_id) || string.IsNullOrEmpty(vote.vote))
+                {
+                    Console.Error.WriteLine("Ignoring invalid vote payload");
+                    continue;
+                }
+                Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
+                try
+                {
+                    await write(vote.voter_id, vote.vote, token);
+                }
+                catch (DbException ex)
+                {
+                    // Do not turn a database outage into a fake duplicate-voter update.
+                    // Redis already popped this payload; see README's delivery limitation.
+                    Console.Error.WriteLine($"Database write failed: {ex}");
+                    await Task.Delay(1000, token);
+                }
+                }
+                catch (JsonException ex)
+                {
+                    log($"Ignoring malformed vote payload: {ex.Message}");
+                }
+            }
+        }
+
+        private static async Task OpenDatabaseAsync(NpgsqlConnection connection, CancellationToken token)
+        {
             while (true)
             {
                 try
                 {
-                    connection = new NpgsqlConnection(connectionString);
-                    connection.Open();
-                    break;
+                    if (connection.State != System.Data.ConnectionState.Closed)
+                        await connection.CloseAsync();
+                    await connection.OpenAsync(token);
+                    using var command = connection.CreateCommand();
+                    command.CommandText = @"CREATE TABLE IF NOT EXISTS votes (
+                        id VARCHAR(255) NOT NULL UNIQUE,
+                        vote VARCHAR(255) NOT NULL
+                    )";
+                    await command.ExecuteNonQueryAsync(token);
+                    Console.Error.WriteLine("Connected to db");
+                    return;
                 }
-                catch (SocketException)
+                catch (DbException ex)
                 {
-                    Console.Error.WriteLine("Waiting for db");
-                    Thread.Sleep(1000);
-                }
-                catch (DbException)
-                {
-                    Console.Error.WriteLine("Waiting for db");
-                    Thread.Sleep(1000);
+                    Console.Error.WriteLine($"Waiting for db: {ex.Message}");
+                    await Task.Delay(1000, token);
                 }
             }
-
-            Console.Error.WriteLine("Connected to db");
-
-            var command = connection.CreateCommand();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS votes (
-                                        id VARCHAR(255) NOT NULL UNIQUE,
-                                        vote VARCHAR(255) NOT NULL
-                                    )";
-            command.ExecuteNonQuery();
-
-            return connection;
         }
 
-        private static ConnectionMultiplexer OpenRedisConnection(string hostname)
+        private static async Task<ConnectionMultiplexer> OpenRedisAsync(CancellationToken token)
         {
-            // Use IP address to workaround https://github.com/StackExchange/StackExchange.Redis/issues/410
-            var ipAddress = GetIp(hostname);
-            Console.WriteLine($"Found redis at {ipAddress}");
-
             while (true)
             {
                 try
                 {
-                    Console.Error.WriteLine("Connecting to redis");
-                    return ConnectionMultiplexer.Connect(ipAddress);
+                    // DNS hostname is handled by the supported Redis client; no IPv4-only lookup.
+                    var options = ConfigurationOptions.Parse(RedisHost);
+                    options.AbortOnConnectFail = false;
+                    var connection = await ConnectionMultiplexer.ConnectAsync(options);
+                    Console.Error.WriteLine("Connected to redis");
+                    return connection;
                 }
-                catch (RedisConnectionException)
+                catch (RedisConnectionException ex)
                 {
-                    Console.Error.WriteLine("Waiting for redis");
-                    Thread.Sleep(1000);
+                    Console.Error.WriteLine($"Waiting for redis: {ex.Message}");
+                    await Task.Delay(1000, token);
                 }
             }
         }
 
-        private static string GetIp(string hostname)
-            => Dns.GetHostEntryAsync(hostname)
-                .Result
-                .AddressList
-                .First(a => a.AddressFamily == AddressFamily.InterNetwork)
-                .ToString();
-
-        private static void UpdateVote(NpgsqlConnection connection, string voterId, string vote)
+        // A pure command-construction seam for a database-free regression test.
+        public static NpgsqlCommand CreateVoteCommand(NpgsqlConnection connection, string voterId, string vote)
         {
             var command = connection.CreateCommand();
-            try
-            {
-                command.CommandText = "INSERT INTO votes (id, vote) VALUES (@id, @vote)";
-                command.Parameters.AddWithValue("@id", voterId);
-                command.Parameters.AddWithValue("@vote", vote);
-                command.ExecuteNonQuery();
-            }
-            catch (DbException)
-            {
-                command.CommandText = "UPDATE votes SET vote = @vote WHERE id = @id";
-                command.ExecuteNonQuery();
-            }
-            finally
-            {
-                command.Dispose();
-            }
+            command.CommandText = @"INSERT INTO votes (id, vote) VALUES (@id, @vote)
+                ON CONFLICT (id) DO UPDATE SET vote = EXCLUDED.vote";
+            command.Parameters.AddWithValue("id", voterId);
+            command.Parameters.AddWithValue("vote", vote);
+            return command;
         }
     }
 }
