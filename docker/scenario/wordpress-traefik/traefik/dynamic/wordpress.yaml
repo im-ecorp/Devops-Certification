@@ -1,0 +1,13 @@
+http:
+  routers:
+    wordpress-lab:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/`)"
+      service: wordpress-lab
+
+  services:
+    wordpress-lab:
+      loadBalancer:
+        servers:
+          - url: "http://wordpress:80"
