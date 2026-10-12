@@ -1,0 +1,54 @@
+# WordPress + MariaDB. Read README.md before starting.
+# Current Compose uses the Compose Specification: no obsolete version: key.
+services:
+  wordpress:
+    # Apache serves HTTP; an FPM-only image would need a separate web server.
+    image: wordpress:php8.3-apache
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8087:80" # Host loopback:host port:container HTTP port.
+    environment:
+      WORDPRESS_DB_HOST: db:3306 # Service DNS name, NOT localhost.
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD as explained in README.md}"
+    depends_on:
+      db:
+        condition: service_healthy # Wait for the DB's health check to pass.
+    volumes:
+      - wordpress-data:/var/www/html # Preserve uploads, themes, and plugins.
+    networks:
+      - frontend # Allows outbound access for updates/plugin downloads.
+      - backend # Access to MariaDB through the private network.
+
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD as explained in README.md}"
+      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD as explained in README.md}"
+    healthcheck:
+      # Supplied by the official MariaDB image; no password in the command.
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - db-data:/var/lib/mysql # Database files survive container recreation.
+    networks:
+      - backend # No published DB port or frontend attachment.
+
+# Service mounts above reference these project-scoped named volumes.
+volumes:
+  wordpress-data:
+  db-data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true # No direct external connectivity for the database.

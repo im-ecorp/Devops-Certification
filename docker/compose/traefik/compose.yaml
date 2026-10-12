@@ -1,0 +1,47 @@
+# Traefik + a tiny HTTP backend. Compose v2.23.1+ supports inline configs.
+services:
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    command: # Static/startup configuration for Traefik itself.
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --providers.file.watch=true
+      - --api.dashboard=false # Do not expose an unauthenticated admin UI.
+    ports:
+      - "127.0.0.1:8088:80" # Only the proxy accepts host traffic.
+    configs:
+      - source: routes
+        target: /etc/traefik/dynamic.yaml
+    networks:
+      - proxy-net
+    depends_on:
+      - whoami # Startup order, not a readiness guarantee.
+
+  whoami:
+    image: traefik/whoami:v1.11.0
+    restart: unless-stopped
+    networks:
+      - proxy-net # No host port: Traefik reaches whoami by service name.
+
+# Dynamic Traefik router/service data, mounted as a file in traefik.
+# This inline Compose config avoids a second YAML file and a Docker socket.
+configs:
+  routes:
+    content: |
+      http:
+        routers:
+          demo:
+            entryPoints:
+              - web
+            rule: "PathPrefix(`/`)"
+            service: demo
+        services:
+          demo:
+            loadBalancer:
+              servers:
+                - url: "http://whoami:80"
+
+networks:
+  proxy-net:
+    driver: bridge

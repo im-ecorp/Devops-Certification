@@ -1,0 +1,15 @@
+# Portainer manages the same Docker Engine this Compose project runs on.
+services:
+  portainer:
+    image: portainer/portainer-ce:2.39.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9443:9443" # HTTPS admin UI; self-signed initial cert.
+    volumes:
+      # Bind mount: grants Docker Engine control, effectively host-root access.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Named volume: preserve Portainer configuration and users.
+      - portainer-data:/data
+
+volumes:
+  portainer-data:
