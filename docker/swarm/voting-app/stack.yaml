@@ -1,0 +1,117 @@
+# Swarm stack format: docker stack deploy does not build images.
+version: "3.8"
+services:
+  vote:
+    image: ${VOTE_IMAGE:?Export VOTE_IMAGE}
+    environment:
+      OPTION_A: Cats
+      OPTION_B: Dogs
+    networks: [frontend, backend]
+    ports:
+      - target: 80
+        published: 8095
+        protocol: tcp
+        mode: ingress
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 2
+      resources:
+        limits: {cpus: "0.50", memory: 256M}
+        reservations: {cpus: "0.10", memory: 64M}
+      restart_policy: {condition: on-failure, delay: 5s}
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+        monitor: 90s
+      rollback_config: {parallelism: 1, order: stop-first}
+  result:
+    image: ${RESULT_IMAGE:?Export RESULT_IMAGE}
+    networks: [frontend, backend]
+    ports:
+      - target: 80
+        published: 8096
+        protocol: tcp
+        mode: ingress
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      # Socket.IO state is in-process: no Redis adapter or sticky-session proxy.
+      replicas: 1
+      resources:
+        limits: {cpus: "0.50", memory: 256M}
+        reservations: {memory: 64M}
+      restart_policy: {condition: on-failure, delay: 5s}
+      update_config: {parallelism: 1, order: stop-first, failure_action: rollback, monitor: 90s}
+  worker:
+    image: ${WORKER_IMAGE:?Export WORKER_IMAGE}
+    networks: [backend]
+    deploy:
+      # A queue consumer is not an HTTP service; no published port.
+      replicas: 1
+      resources:
+        limits: {cpus: "0.50", memory: 256M}
+        reservations: {memory: 64M}
+      restart_policy: {condition: on-failure, delay: 5s}
+      update_config: {parallelism: 1, order: stop-first, failure_action: rollback, monitor: 90s}
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      resources:
+        limits: {memory: 128M}
+        reservations: {memory: 32M}
+      restart_policy: {condition: on-failure, delay: 5s}
+      update_config: {parallelism: 1, order: stop-first}
+  db:
+    image: postgres:15-alpine
+    # PUBLIC demo credentials: existing worker/result source hardcodes them.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes: [db-data:/var/lib/postgresql/data]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.labels.voting-db == true"]
+      resources:
+        limits: {cpus: "1.0", memory: 512M}
+        reservations: {memory: 128M}
+      restart_policy: {condition: on-failure, delay: 5s}
+      update_config: {parallelism: 1, order: stop-first}
+networks:
+  frontend:
+    driver: overlay
+  backend:
+    driver: overlay
+    internal: true
+    driver_opts:
+      encrypted: ""
+volumes:
+  db-data:
+    driver: local
