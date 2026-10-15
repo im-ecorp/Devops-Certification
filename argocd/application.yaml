@@ -1,0 +1,21 @@
+# Change repoURL and targetRevision to your published fork/branch before applying.
+# Argo CD reads the remote Git repository, not this local checkout.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: web-demo
+  namespace: argocd
+  # No deletion finalizer: deleting this Application does not cascade to workloads.
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/im-ecorp/Devops-Certification.git
+    targetRevision: main
+    path: argocd/apps/web-demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: web-demo
+  syncPolicy:
+    # Manual sync first. Auto-sync, self-heal and pruning are not enabled.
+    syncOptions:
+      - CreateNamespace=true

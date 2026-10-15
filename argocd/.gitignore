@@ -1,0 +1,5 @@
+# Optional private/local Application overrides; never commit credentials.
+application.local.yaml
+.env
+.env.*
+!.env.example
