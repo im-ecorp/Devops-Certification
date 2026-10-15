@@ -1,0 +1,8 @@
+---
+
+- name: Install and configure Argo CD service
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - argocd_setup

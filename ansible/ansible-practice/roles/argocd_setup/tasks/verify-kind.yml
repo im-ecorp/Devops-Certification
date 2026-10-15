@@ -1,0 +1,49 @@
+---
+
+- name: Read kubeconfig from the named Kind cluster
+  environment:
+    KIND_EXPERIMENTAL_PROVIDER: docker
+  ansible.builtin.command:
+    argv:
+      - kind
+      - get
+      - kubeconfig
+      - --name
+      - "{{ argocd_kind_cluster_name }}"
+  register: argocd_expected_kind_config
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Read selected kubeconfig identity without contacting Kubernetes
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ argocd_kubeconfig }}"
+      - --context
+      - "{{ argocd_kubectl_context }}"
+      - config
+      - view
+      - --minify
+      - --raw
+      - -o
+      - json
+  register: argocd_selected_kind_config
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Validate the selected Kind endpoint and CA identity
+  ansible.builtin.assert:
+    that:
+      - >-
+        (argocd_selected_kind_config.stdout | from_json).clusters[0].cluster.server ==
+        (argocd_expected_kind_config.stdout | from_yaml).clusters[0].cluster.server
+      - >-
+        (argocd_selected_kind_config.stdout | from_json).clusters[0].cluster['certificate-authority-data'] ==
+        (argocd_expected_kind_config.stdout | from_yaml).clusters[0].cluster['certificate-authority-data']
+      - >-
+        not ((argocd_selected_kind_config.stdout | from_json).clusters[0].cluster['insecure-skip-tls-verify'] | default(false))
+    fail_msg: "The selected kubeconfig does not match the named Kind cluster; refusing cluster changes."
+  no_log: true

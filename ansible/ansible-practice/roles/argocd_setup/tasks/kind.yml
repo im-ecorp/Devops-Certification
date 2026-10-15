@@ -1,0 +1,100 @@
+---
+
+- name: Prepare Kind tools
+  ansible.builtin.import_tasks: tools.yml
+
+- name: Create service directory for Kind
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Template Kind configuration
+  ansible.builtin.template:
+    src: kind-config.yml.j2
+    dest: "{{ service_dir }}/kind-config.yml"
+    mode: "0644"
+    backup: true
+
+- name: List existing Kind clusters
+  ansible.builtin.command: kind get clusters
+  environment:
+    KIND_EXPERIMENTAL_PROVIDER: docker
+  register: argocd_kind_clusters
+  changed_when: false
+  check_mode: false
+
+- name: Check dedicated kubeconfig
+  ansible.builtin.stat:
+    path: "{{ argocd_kubeconfig }}"
+  register: argocd_kind_kubeconfig
+
+- name: Refuse existing dedicated kubeconfig on new cluster creation
+  ansible.builtin.assert:
+    that:
+      - not argocd_kind_kubeconfig.stat.exists or argocd_kind_cluster_name in argocd_kind_clusters.stdout_lines
+    fail_msg: "Dedicated kubeconfig already exists without this Kind cluster; inspect it before proceeding."
+
+- name: Create dedicated Kind cluster
+  ansible.builtin.command:
+    argv:
+      - kind
+      - create
+      - cluster
+      - --name
+      - "{{ argocd_kind_cluster_name }}"
+      - --kubeconfig
+      - "{{ argocd_kubeconfig }}"
+      - --config
+      - "{{ service_dir }}/kind-config.yml"
+      - --wait
+      - "{{ argocd_kind_wait }}"
+  environment:
+    KIND_EXPERIMENTAL_PROVIDER: docker
+    KIND_EXPERIMENTAL_DOCKER_NETWORK: "{{ argocd_cluster_network }}"
+  when:
+    - not ansible_check_mode
+    - argocd_kind_cluster_name not in argocd_kind_clusters.stdout_lines
+  changed_when: true
+
+- name: Export missing kubeconfig for an existing Kind cluster
+  environment:
+    KIND_EXPERIMENTAL_PROVIDER: docker
+  ansible.builtin.command:
+    argv:
+      - kind
+      - export
+      - kubeconfig
+      - --name
+      - "{{ argocd_kind_cluster_name }}"
+      - --kubeconfig
+      - "{{ argocd_kubeconfig }}"
+  when:
+    - not ansible_check_mode
+    - argocd_kind_cluster_name in argocd_kind_clusters.stdout_lines
+    - not argocd_kind_kubeconfig.stat.exists
+  changed_when: true
+
+- name: Protect dedicated Kind kubeconfig
+  ansible.builtin.file:
+    path: "{{ argocd_kubeconfig }}"
+    mode: "0600"
+  when: not ansible_check_mode
+
+- name: Verify kubeconfig belongs to the named Kind cluster
+  ansible.builtin.import_tasks: verify-kind.yml
+  when: not ansible_check_mode
+
+- name: Verify dedicated cluster access
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ argocd_kubeconfig }}"
+      - --context
+      - "{{ argocd_kubectl_context }}"
+      - --request-timeout=30s
+      - get
+      - --raw=/readyz
+  changed_when: false
+  when: not ansible_check_mode

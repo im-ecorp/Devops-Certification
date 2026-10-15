@@ -1,0 +1,70 @@
+---
+
+- name: Validate Kind host platform
+  ansible.builtin.assert:
+    that:
+      - ansible_system == 'Linux'
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: "Kind mode requires a Linux Docker host on x86_64 or aarch64."
+
+- name: Verify Docker is installed and running
+  ansible.builtin.command: docker info --format '{{ '{{json .ServerVersion}}' }}'
+  changed_when: false
+  check_mode: false
+
+- name: Inspect host Kind binary
+  ansible.builtin.command: kind version
+  register: argocd_kind_tool
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Locate existing Kind binary
+  ansible.builtin.shell: command -v kind
+  register: argocd_kind_path
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Inspect host kubectl binary
+  ansible.builtin.command: kubectl version --client=true
+  register: argocd_kubectl_tool
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Locate existing kubectl binary
+  ansible.builtin.shell: command -v kubectl
+  register: argocd_kubectl_path
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Preserve existing tools that need manual repair
+  ansible.builtin.assert:
+    that:
+      - argocd_kind_path.rc != 0 or argocd_kind_tool.rc == 0
+      - argocd_kubectl_path.rc != 0 or argocd_kubectl_tool.rc == 0
+    fail_msg: "An existing Kind or kubectl binary failed its version check; repair it explicitly before proceeding."
+
+- name: Install missing Kind binary
+  ansible.builtin.get_url:
+    url: "https://github.com/kubernetes-sigs/kind/releases/download/{{ argocd_kind_version }}/kind-linux-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+    dest: /usr/local/bin/kind
+    checksum: "sha256:{{ argocd_kind_checksums[ansible_architecture] }}"
+    mode: "0755"
+    backup: true
+  when:
+    - argocd_kind_path.rc != 0
+    - not ansible_check_mode
+
+- name: Install missing kubectl binary
+  ansible.builtin.get_url:
+    url: "https://dl.k8s.io/release/{{ argocd_kubectl_version }}/bin/linux/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/kubectl"
+    dest: /usr/local/bin/kubectl
+    checksum: "sha256:{{ argocd_kubectl_checksums[ansible_architecture] }}"
+    mode: "0755"
+    backup: true
+  when:
+    - argocd_kubectl_path.rc != 0
+    - not ansible_check_mode

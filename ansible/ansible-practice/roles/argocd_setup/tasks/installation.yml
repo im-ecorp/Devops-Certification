@@ -1,0 +1,192 @@
+---
+
+- name: Create service directory
+  ansible.builtin.file:
+    path: "{{ service_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - preparing
+    - pull
+    - deploy
+
+- name: Template namespace manifest
+  ansible.builtin.template:
+    src: namespace.yml.j2
+    dest: "{{ service_dir }}/namespace.yml"
+    mode: "0644"
+    backup: true
+  when: not ansible_check_mode or argocd_service_directory.stat.isdir | default(false)
+  tags:
+    - preparing
+
+- name: Template Argo CD manifest customization
+  ansible.builtin.template:
+    src: kustomization.yml.j2
+    dest: "{{ service_dir }}/kustomization.yaml"
+    mode: "0644"
+    backup: true
+  when: not ansible_check_mode or argocd_service_directory.stat.isdir | default(false)
+  tags:
+    - preparing
+
+- name: Download selected Argo CD manifest
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_resolved_version }}/manifests/install.yaml"
+    dest: "{{ service_dir }}/install-{{ argocd_resolved_version }}.yml"
+    checksum: "sha256:{{ argocd_resolved_manifest_sha256 }}"
+    mode: "0644"
+    timeout: 60
+    backup: true
+  when: not ansible_check_mode
+  tags:
+    - pull
+
+- name: Apply Argo CD installation
+  when: not ansible_check_mode
+  tags:
+    - deploy
+  block:
+    - name: Verify the prepared release manifest
+      ansible.builtin.stat:
+        path: "{{ service_dir }}/install-{{ argocd_resolved_version }}.yml"
+        checksum_algorithm: sha256
+      register: argocd_prepared_manifest
+
+    - name: Require the reviewed release manifest before applying resources
+      ansible.builtin.assert:
+        that:
+          - argocd_prepared_manifest.stat.checksum | default('') == argocd_resolved_manifest_sha256
+        fail_msg: "The prepared manifest is missing or its checksum differs; run the full role to prepare the reviewed release."
+
+    - name: Read the prepared manifest customization
+      ansible.builtin.slurp:
+        src: "{{ service_dir }}/kustomization.yaml"
+      register: argocd_prepared_customization
+
+    - name: Require the customization to use the selected release
+      ansible.builtin.assert:
+        that:
+          - >-
+            ('install-' ~ argocd_resolved_version ~ '.yml') in
+            (argocd_prepared_customization.content | b64decode | from_yaml).resources
+        fail_msg: "The customization targets another release; run the full role when changing Argo CD versions."
+
+    - name: Verify kubectl compatibility with the target cluster
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ argocd_kubeconfig }}"
+          - --context
+          - "{{ argocd_kubectl_context }}"
+          - --request-timeout=30s
+          - version
+          - -o
+          - json
+      register: argocd_cluster_version
+      changed_when: false
+
+    - name: Require a supported kubectl version skew
+      ansible.builtin.assert:
+        that:
+          - >-
+            (argocd_cluster_version.stdout | from_json).clientVersion.major ==
+            (argocd_cluster_version.stdout | from_json).serverVersion.major
+          - >-
+            (((argocd_cluster_version.stdout | from_json).clientVersion.minor | regex_replace('[^0-9].*$', '') | int) -
+             ((argocd_cluster_version.stdout | from_json).serverVersion.minor | regex_replace('[^0-9].*$', '') | int)) | abs <= 1
+        fail_msg: "Existing kubectl must be within one minor version of the API server; update it explicitly."
+
+    - name: Validate the complete manifest customization before applying resources
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - kustomize
+          - "{{ service_dir }}"
+      changed_when: false
+      no_log: true
+
+    - name: Create Argo CD namespace
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ argocd_kubeconfig }}"
+          - --context
+          - "{{ argocd_kubectl_context }}"
+          - --request-timeout=60s
+          - apply
+          - -f
+          - "{{ service_dir }}/namespace.yml"
+      register: argocd_namespace_apply
+      changed_when: >-
+        'created' in argocd_namespace_apply.stdout or
+        'configured' in argocd_namespace_apply.stdout
+
+    - name: Check Argo CD manifest changes
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ argocd_kubeconfig }}"
+          - --context
+          - "{{ argocd_kubectl_context }}"
+          - --request-timeout=60s
+          - --namespace
+          - "{{ argocd_namespace }}"
+          - diff
+          - --server-side=true
+          - --field-manager=ansible-argocd
+          - -k
+          - "{{ service_dir }}"
+      register: argocd_manifest_diff
+      changed_when: false
+      failed_when: argocd_manifest_diff.rc not in [0, 1]
+      no_log: true
+
+    - name: Apply selected Argo CD manifest
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ argocd_kubeconfig }}"
+          - --context
+          - "{{ argocd_kubectl_context }}"
+          - --request-timeout=60s
+          - --namespace
+          - "{{ argocd_namespace }}"
+          - apply
+          - --server-side=true
+          - --field-manager=ansible-argocd
+          - -k
+          - "{{ service_dir }}"
+      when: argocd_manifest_diff.rc == 1
+      register: argocd_manifest_apply
+      changed_when: true
+
+    - name: Wait for Argo CD workloads to be available
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ argocd_kubeconfig }}"
+          - --context
+          - "{{ argocd_kubectl_context }}"
+          - --request-timeout=0
+          - --namespace
+          - "{{ argocd_namespace }}"
+          - rollout
+          - status
+          - "{{ item }}"
+          - "--timeout={{ argocd_rollout_timeout }}s"
+      changed_when: false
+      loop:
+        - deployment/argocd-redis
+        - deployment/argocd-repo-server
+        - deployment/argocd-dex-server
+        - deployment/argocd-server
+        - deployment/argocd-applicationset-controller
+        - deployment/argocd-notifications-controller
+        - statefulset/argocd-application-controller
+

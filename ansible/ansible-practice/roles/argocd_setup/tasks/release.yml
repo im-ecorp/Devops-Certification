@@ -1,0 +1,43 @@
+---
+
+- name: Resolve newest stable Argo CD release
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/argoproj/argo-cd/releases/latest
+    return_content: true
+    timeout: 30
+  register: argocd_release_response
+  check_mode: false
+  when: argocd_version_override | length == 0 and argocd_release == 'latest'
+
+- name: Select the exact Argo CD release
+  ansible.builtin.set_fact:
+    argocd_resolved_version: >-
+      {{ argocd_version_override if argocd_version_override else
+         (argocd_release_response.json.tag_name if argocd_release == 'latest' else argocd_release) }}
+
+- name: Validate the selected stable release
+  ansible.builtin.assert:
+    that:
+      - argocd_resolved_version is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+      - argocd_version_override | length > 0 or argocd_release != 'latest' or not argocd_release_response.json.prerelease
+      - argocd_version_override | length > 0 or argocd_release != 'latest' or not argocd_release_response.json.draft
+    fail_msg: "Release discovery did not return a stable Argo CD version; no deployment was changed."
+
+- name: Select the manifest checksum
+  ansible.builtin.set_fact:
+    argocd_resolved_manifest_sha256: >-
+      {{ argocd_manifest_sha256 if argocd_manifest_sha256 else
+         argocd_manifest_checksums.get(argocd_resolved_version, '') }}
+
+- name: Require a reviewed manifest checksum
+  ansible.builtin.assert:
+    that:
+      - argocd_resolved_manifest_sha256 is match('^[a-f0-9]{64}$')
+    fail_msg: >-
+      No SHA-256 is configured for {{ argocd_resolved_version }}. Review that
+      release and set argocd_manifest_sha256 or add its checksum to
+      argocd_manifest_checksums before deploying it.
+
+- name: Show selected Argo CD release
+  ansible.builtin.debug:
+    msg: "Selected Argo CD {{ argocd_resolved_version }} (matching complete manifest and images)."

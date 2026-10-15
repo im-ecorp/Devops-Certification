@@ -1,0 +1,105 @@
+---
+
+- name: Inspect the Kubernetes node network
+  community.docker.docker_network_info:
+    name: "{{ argocd_cluster_network }}"
+  register: argocd_cluster_network_info
+
+- name: Require an existing Kubernetes node network
+  ansible.builtin.assert:
+    that:
+      - argocd_cluster_network_info.exists
+    fail_msg: "The Kubernetes node Docker network must exist before deploying the proxy."
+  when: not ansible_check_mode
+
+- name: Create Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver_options:
+      com.docker.network.bridge.name: "{{ item }}"
+    state: present
+  loop:
+    - web_net
+    - app_net
+  tags:
+    - preparing
+    - docker
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ service_dir }}/docker-compose.yml"
+    mode: "0644"
+    backup: true
+  notify: Restart Argo CD proxy
+  when: not ansible_check_mode or argocd_service_directory.stat.isdir | default(false)
+  tags:
+    - preparing
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ service_dir }}/.env"
+    mode: "0600"
+    backup: true
+  notify: Restart Argo CD proxy
+  when: not ansible_check_mode or argocd_service_directory.stat.isdir | default(false)
+  tags:
+    - preparing
+
+- name: Template Nginx upstream configuration
+  ansible.builtin.template:
+    src: nginx.conf.template.j2
+    dest: "{{ service_dir }}/nginx.conf.template"
+    mode: "0644"
+    backup: true
+  notify: Restart Argo CD proxy
+  when: not ansible_check_mode or argocd_service_directory.stat.isdir | default(false)
+  tags:
+    - preparing
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ service_dir }}"
+  when: not ansible_check_mode
+  tags:
+    - pull
+
+- name: Deploy Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ service_dir }}"
+  when: not ansible_check_mode
+  tags:
+    - deploy
+
+- name: Apply pending Argo CD proxy restart
+  ansible.builtin.meta: flush_handlers
+  when: not ansible_check_mode
+  tags:
+    - deploy
+
+- name: Wait for Argo CD proxy to be healthy
+  community.docker.docker_container_info:
+    name: argocd-proxy
+  register: argocd_proxy_container
+  until: >-
+    ((argocd_proxy_container.container | default({})).get('State', {}).get('Health', {}).get('Status', '')) == 'healthy'
+  retries: 30
+  delay: 5
+  when: not ansible_check_mode
+  tags:
+    - deploy
+
+- name: Wait for Argo CD to be available
+  ansible.builtin.uri:
+    url: "https://{{ argocd_domain }}/healthz"
+    status_code: 200
+    validate_certs: true
+    timeout: 10
+  register: argocd_public_health
+  until: argocd_public_health.status | default(0) == 200
+  retries: 30
+  delay: 5
+  when: not ansible_check_mode
+  tags:
+    - deploy

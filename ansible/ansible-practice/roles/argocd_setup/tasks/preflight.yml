@@ -1,0 +1,114 @@
+---
+
+- name: Validate Argo CD configuration
+  ansible.builtin.assert:
+    that:
+      - argocd_kubeconfig is match('^/[A-Za-z0-9_./-]+$')
+      - argocd_kubectl_context is match('^[A-Za-z0-9_.:/@-]+$')
+      - argocd_kubectl_context | length > 0
+      - argocd_namespace == 'argocd'
+      - argocd_release == 'latest' or argocd_release is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+      - argocd_version_override == '' or argocd_version_override is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+      - argocd_manifest_sha256 == '' or argocd_manifest_sha256 is match('^[a-f0-9]{64}$')
+      - argocd_manifest_checksums is mapping
+      - argocd_rollout_timeout | int > 0
+      - service_dir is match('^/')
+      - argocd_kind_cluster_name is match('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+      - not argocd_use_kind or argocd_kubectl_context == 'kind-' ~ argocd_kind_cluster_name
+      - not argocd_traefik_enabled or argocd_domain is match('^[A-Za-z0-9][A-Za-z0-9.-]+[A-Za-z0-9]$')
+      - argocd_node_port | int >= 30000
+      - argocd_node_port | int <= 32767
+      - argocd_proxy_port | int > 1024
+      - argocd_proxy_port | int < 65536
+      - argocd_backend_host is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - argocd_cluster_network is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - argocd_use_kind is boolean
+      - argocd_traefik_enabled is boolean
+    fail_msg: >-
+      Set an absolute argocd_kubeconfig path and explicit argocd_kubectl_context.
+      The standard manifest requires namespace argocd; review the pinned
+      version, checksum, service directory, and rollout timeout.
+
+- name: Check target kubeconfig
+  ansible.builtin.stat:
+    path: "{{ argocd_kubeconfig }}"
+  register: argocd_kubeconfig_file
+
+- name: Require a full run before using individual lifecycle tags
+  ansible.builtin.assert:
+    that:
+      - argocd_kubeconfig_file.stat.isreg | default(false)
+    fail_msg: "Run the full role first to create the dedicated Kind cluster and kubeconfig."
+  when:
+    - argocd_use_kind
+    - ansible_run_tags | intersect(['all', 'install_argocd', 'setup_argocd']) | length == 0
+
+- name: Verify existing Kind kubeconfig before preparing changes
+  ansible.builtin.import_tasks: verify-kind.yml
+  when:
+    - argocd_use_kind
+    - argocd_kubeconfig_file.stat.exists
+
+- name: Check existing service directory
+  ansible.builtin.stat:
+    path: "{{ service_dir }}"
+  register: argocd_service_directory
+
+- name: Verify target kubeconfig exists
+  ansible.builtin.assert:
+    that:
+      - argocd_kubeconfig_file.stat.isreg | default(false)
+    fail_msg: "The kubeconfig must exist on the target host and be readable by the become user."
+  when: not argocd_use_kind
+
+- name: Verify kubectl and target cluster access
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ argocd_kubeconfig }}"
+      - --context
+      - "{{ argocd_kubectl_context }}"
+      - --request-timeout=30s
+      - get
+      - --raw=/readyz
+  changed_when: false
+  check_mode: false
+  when: not argocd_use_kind
+
+- name: Inspect existing Traefik container
+  community.docker.docker_container_info:
+    name: traefik
+  register: argocd_traefik_container
+  when: argocd_traefik_enabled
+
+- name: Require the existing Docker Traefik router
+  ansible.builtin.assert:
+    that:
+      - argocd_traefik_container.exists
+      - argocd_traefik_container.container.State.Running
+      - "'web_net' in argocd_traefik_container.container.NetworkSettings.Networks"
+      - "'--providers.docker=true' in argocd_traefik_container.container.Config.Cmd"
+      - "'--entryPoints.web.address=:80' in argocd_traefik_container.container.Config.Cmd"
+      - "'--entryPoints.web-secure.address=:443' in argocd_traefik_container.container.Config.Cmd"
+      - "'--entryPoints.web.http.redirections.entryPoint.to=web-secure' in argocd_traefik_container.container.Config.Cmd"
+      - "'--entryPoints.web.http.redirections.entryPoint.scheme=https' in argocd_traefik_container.container.Config.Cmd"
+      - "argocd_traefik_container.container.Config.Cmd | select('match', '^--certificatesresolvers[.]myproduction[.]acme[.]') | list | length > 0"
+    fail_msg: "Deploy the existing Traefik with web_net, Docker discovery, HTTP-to-HTTPS redirect, web-secure and myproduction first."
+  when: argocd_traefik_enabled
+
+- name: Inspect previous port-forward service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/argocd-port-forward.service
+  register: argocd_legacy_unit
+  when: argocd_traefik_enabled
+
+- name: Require explicit migration from an old port-forward installation
+  ansible.builtin.assert:
+    that:
+      - not argocd_legacy_unit.stat.exists
+    fail_msg: >-
+      An old argocd-port-forward.service exists. Review and retire its service
+      and file-provider router before deploying the Docker-label route.
+      This role does not remove existing infrastructure automatically.
+  when: argocd_traefik_enabled

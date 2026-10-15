@@ -1,0 +1,82 @@
+---
+# Default variables for Argo CD on a dedicated Kind cluster.
+
+# Exact release for repeatable runs; use latest for opt-in stable discovery.
+argocd_release: "v3.5.5"
+
+# Optional exact release (for example v3.5.5); overrides the latest channel.
+argocd_version_override: ""
+
+# Optional SHA-256 override for a release not listed below.
+argocd_manifest_sha256: ""
+
+# Reviewed manifest checksums keyed by exact release (not a signature).
+argocd_manifest_checksums:
+  v3.5.5: "90dc9094bf4c5964afd9c0e35d735e1c2fcbbda4f8e36799c092d9864ed65f50"
+
+# Service directory on the target host (stores the verified upstream manifest).
+service_dir: "{{ project_dir }}/argocd"
+
+# Create a dedicated Kind cluster; otherwise require an existing cluster.
+argocd_use_kind: true
+
+# Dedicated Kind cluster name.
+argocd_kind_cluster_name: "argocd"
+
+# Separate Kind kubeconfig or an explicit inventory path for existing clusters.
+argocd_kubeconfig: "{{ (service_dir ~ '/kind-kubeconfig') if argocd_use_kind else '' }}"
+
+# Explicit context; Kind mode never changes the user's default context.
+argocd_kubectl_context: "{{ ('kind-' ~ argocd_kind_cluster_name) if argocd_use_kind else '' }}"
+
+# Enable the Docker-label router and internal Nginx bridge.
+argocd_traefik_enabled: true
+
+# Domain inherits the shared main_domain inventory variable.
+argocd_domain: "argocd.k8sforfun.com"
+
+# Published upstream Nginx image used only to bridge Traefik to Kubernetes.
+argocd_proxy_image_tag: "1.28.3-alpine"
+
+# Internal Nginx listener; no host port is published.
+argocd_proxy_port: 8080
+
+# HTTPS NodePort for the Argo CD server (inside the Docker node network).
+argocd_node_port: 30443
+
+# Existing Docker network containing the Kubernetes node.
+argocd_cluster_network: "kind"
+
+# Reachable node DNS name; override with a node address for an existing cluster.
+argocd_backend_host: "{{ argocd_kind_cluster_name }}-control-plane"
+
+# Restart policy matching the surrounding Compose roles.
+restart_policy: "unless-stopped"
+
+# Require a private Kind API listener and one control-plane node.
+argocd_kind_wait: "180s"
+
+# Kind binary release, checked against upstream SHA-256.
+argocd_kind_version: "v0.33.0"
+
+# Kind node version/digest tested with Argo CD 3.5.
+argocd_kind_node_image: "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+
+# Matching kubectl version for the Kind node; do not replace host kubectl if present.
+argocd_kubectl_version: "v1.36.4"
+
+# Upstream binary SHA-256 digests per architecture.
+argocd_kind_checksums:
+  x86_64: "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d"
+  aarch64: "20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2"
+
+# Official kubectl SHA-256 digests for the selected version.
+argocd_kubectl_checksums:
+  x86_64: "8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a"
+  aarch64: "0ecf44450ee6063bf19dd166a103ee6df4a9034455c2abce626e6eea657d73fb"
+
+# Kubernetes namespace for the standard upstream installation.
+argocd_namespace: "argocd"
+
+# Rollout timeout in seconds for the Argo CD server and controllers.
+argocd_rollout_timeout: 300

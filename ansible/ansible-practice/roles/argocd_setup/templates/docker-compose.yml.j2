@@ -1,0 +1,42 @@
+services:
+  argocd-proxy:
+    image: nginx:${argocd_proxy_image_tag}
+    container_name: argocd-proxy
+    hostname: argocd-proxy
+    restart: ${restart_policy}
+    environment:
+      argocd_proxy_port: ${argocd_proxy_port}
+      argocd_node_port: ${argocd_node_port}
+      argocd_backend_host: ${argocd_backend_host}
+      NGINX_ENVSUBST_FILTER: "^argocd_"
+    volumes:
+      - ${service_dir}/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - web_net
+      - cluster_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$${argocd_proxy_port}/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.http-argocd.rule=Host(`${argocd_domain}`)"
+      - "traefik.http.routers.http-argocd.entrypoints=web"
+      - "traefik.http.routers.argocd.rule=Host(`${argocd_domain}`)"
+      - "traefik.http.routers.argocd.entrypoints=web-secure"
+      - "traefik.http.routers.argocd.tls=true"
+      - "traefik.http.routers.argocd.tls.certresolver=myproduction"
+      - "traefik.http.routers.argocd.service=argocd"
+      - "traefik.http.services.argocd.loadBalancer.server.port=${argocd_proxy_port}"
+
+networks:
+  web_net:
+    external: true
+  app_net:
+    external: true
+  cluster_net:
+    external: true
+    name: ${argocd_cluster_network}

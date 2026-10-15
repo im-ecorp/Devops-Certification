@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: "127.0.0.1"
+nodes:
+  - role: control-plane
+    image: {{ argocd_kind_node_image }}

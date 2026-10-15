@@ -1,0 +1,36 @@
+---
+
+- name: Setup Argo CD Service | Preflight
+  ansible.builtin.import_tasks: preflight.yml
+  tags:
+    - always
+
+- name: Setup Argo CD Service | Release
+  ansible.builtin.import_tasks: release.yml
+  tags:
+    - install_argocd
+    - setup_argocd
+    - preparing
+    - pull
+    - deploy
+
+- name: Setup Argo CD Service | Kind cluster
+  ansible.builtin.import_tasks: kind.yml
+  when: argocd_use_kind and not ansible_check_mode
+  tags:
+    - install_argocd
+    - setup_argocd
+
+- name: Setup Argo CD Service | Installation
+  ansible.builtin.import_tasks: installation.yml
+  tags:
+    - install_argocd
+    - setup_argocd
+
+- name: Setup Argo CD Service | Traefik routing
+  ansible.builtin.import_tasks: routing.yml
+  when: argocd_traefik_enabled
+  tags:
+    - install_argocd
+    - setup_argocd
+    - route_argocd
